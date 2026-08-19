@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Remisiones Chatarrería</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark" id="brand-mark">R</div>
+      <div>
+        <div class="brand-title" id="brand-title">Remisiones</div>
+        <div class="brand-sub">Chatarrería</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" data-view="dashboard">Resumen</button>
+      <button class="nav-item" data-view="nueva-remision">Nueva remisión</button>
+      <button class="nav-item" data-view="remisiones">Remisiones</button>
+      <button class="nav-item" data-view="generadores">Generadores</button>
+      <button class="nav-item" data-view="certificados">Certificados</button>
+      <button class="nav-item" data-view="empresa">Mi empresa</button>
+    </nav>
+    <div class="sidebar-foot">Conectado a la base de datos</div>
+  </aside>
+
+  <main class="content">
+
+    <!-- DASHBOARD -->
+    <section id="view-dashboard" class="view active">
+      <header class="view-header">
+        <h1>Resumen</h1>
+      </header>
+      <div class="stat-grid" id="stat-grid"></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Últimas remisiones</h2>
+          <button class="btn btn-primary" data-view-link="nueva-remision">+ Nueva remisión</button>
+        </div>
+        <div id="dashboard-recent"></div>
+      </div>
+    </section>
+
+    <!-- NUEVA REMISION -->
+    <section id="view-nueva-remision" class="view">
+      <header class="view-header">
+        <h1>Nueva remisión</h1>
+        <p>Manifiesto de carga para la recolección de residuos en el sitio del generador.</p>
+      </header>
+      <form id="form-remision" class="panel form-grid">
+        <h3 class="subhead">Cliente / generador</h3>
+        <div class="field">
+          <label>Generador de residuos</label>
+          <select id="rem-generador" required></select>
+        </div>
+        <div class="field">
+          <label>Fecha de programación</label>
+          <input type="date" id="rem-fecha" required>
+        </div>
+
+        <h3 class="subhead">Transporte</h3>
+        <div class="field">
+          <label>Vehículo</label>
+          <input type="text" id="rem-vehiculo" placeholder="Ej: Foton blanco">
+        </div>
+        <div class="field">
+          <label>Placa</label>
+          <input type="text" id="rem-placa" placeholder="ABC123">
+        </div>
+        <div class="field">
+          <label>Conductor — nombre</label>
+          <input type="text" id="rem-conductor-nombre" placeholder="Nombre completo">
+        </div>
+        <div class="field">
+          <label>Conductor — cédula</label>
+          <input type="text" id="rem-conductor-cedula" placeholder="Número de cédula">
+        </div>
+        <div class="field">
+          <label>Auxiliar — nombre <span class="hint">(opcional)</span></label>
+          <input type="text" id="rem-auxiliar-nombre" placeholder="Nombre completo">
+        </div>
+        <div class="field">
+          <label>Auxiliar — cédula</label>
+          <input type="text" id="rem-auxiliar-cedula" placeholder="Número de cédula">
+        </div>
+        <div class="field">
+          <label>Responsable <span class="hint">(quien firma por la empresa)</span></label>
+          <input type="text" id="rem-responsable" placeholder="Nombre">
+        </div>
+        <div class="field">
+          <label>Destino</label>
+          <input type="text" id="rem-destino" placeholder="Ej: Planta de aprovechamiento">
+        </div>
+        <div class="field">
+          <label>Hora de llegada al cliente</label>
+          <input type="time" id="rem-hora-llegada">
+        </div>
+        <div class="field">
+          <label>Hora de salida del cliente</label>
+          <input type="time" id="rem-hora-salida">
+        </div>
+
+        <h3 class="subhead">Materiales</h3>
+        <div class="field field-full">
+          <table class="materiales-table" id="materiales-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Estado</th>
+                <th>Disposición</th>
+                <th>Unid.</th>
+                <th>Cant.</th>
+                <th>Valor unit.</th>
+                <th>Valor total</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="materiales-body"></tbody>
+          </table>
+          <button type="button" class="btn btn-secondary" id="btn-add-material">+ Agregar material</button>
+        </div>
+
+        <div class="field field-full totals-row">
+          <div>Total kg: <strong id="total-kg">0</strong></div>
+          <div>Total valor: <strong id="total-valor">$0</strong></div>
+        </div>
+
+        <div class="field field-full">
+          <label>Observaciones</label>
+          <textarea id="rem-observaciones" rows="2"></textarea>
+        </div>
+
+        <div class="field field-full">
+          <label>Responsable cliente <span class="hint">(quien firma en el sitio, por el generador)</span></label>
+          <input type="text" id="rem-responsable-cliente" placeholder="Nombre de quien recibe la visita">
+        </div>
+
+        <div class="field field-full form-actions">
+          <button type="submit" class="btn btn-primary">Guardar remisión</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- REMISIONES -->
+    <section id="view-remisiones" class="view">
+      <header class="view-header">
+        <h1>Remisiones</h1>
+      </header>
+      <div class="panel">
+        <div class="filters">
+          <select id="filter-generador"><option value="">Todos los generadores</option></select>
+          <input type="month" id="filter-mes">
+          <select id="filter-estado">
+            <option value="">Todos los estados</option>
+            <option value="pendiente">Pendiente de envío</option>
+            <option value="enviada">Enviada</option>
+          </select>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Fecha</th>
+              <th>Generador</th>
+              <th>Total kg</th>
+              <th>Valor</th>
+              <th>Estado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="remisiones-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- GENERADORES -->
+    <section id="view-generadores" class="view">
+      <header class="view-header">
+        <h1>Generadores de residuos</h1>
+      </header>
+      <div class="panel">
+        <form id="form-generador" class="form-grid">
+          <div class="field">
+            <label>Razón social / nombre</label>
+            <input type="text" id="gen-nombre" required>
+          </div>
+          <div class="field">
+            <label>NIT / CC</label>
+            <input type="text" id="gen-nit" required>
+          </div>
+          <div class="field">
+            <label>Sucursal <span class="hint">(nombre de la sede)</span></label>
+            <input type="text" id="gen-sucursal" placeholder="Ej: Sede Principal">
+          </div>
+          <div class="field">
+            <label>Dirección</label>
+            <input type="text" id="gen-direccion">
+          </div>
+          <div class="field">
+            <label>Ciudad</label>
+            <input type="text" id="gen-ciudad">
+          </div>
+          <div class="field">
+            <label>Contacto</label>
+            <input type="text" id="gen-contacto">
+          </div>
+          <div class="field">
+            <label>Teléfono</label>
+            <input type="text" id="gen-telefono">
+          </div>
+          <div class="field">
+            <label>Email (para envío de remisiones / certificados)</label>
+            <input type="email" id="gen-email">
+          </div>
+          <div class="field form-actions">
+            <button type="submit" class="btn btn-primary">Guardar generador</button>
+          </div>
+        </form>
+      </div>
+      <div class="panel">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>NIT</th>
+              <th>Ciudad</th>
+              <th>Contacto</th>
+              <th>Email</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="generadores-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- CERTIFICADOS -->
+    <section id="view-certificados" class="view">
+      <header class="view-header">
+        <h1>Certificados mensuales</h1>
+      </header>
+      <div class="panel">
+        <div class="filters">
+          <select id="cert-generador"></select>
+          <input type="month" id="cert-mes">
+          <button class="btn btn-primary" id="btn-generar-cert">Generar certificado</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Certificados generados</h2>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Generador</th>
+              <th>Periodo</th>
+              <th>Total kg</th>
+              <th>Remisiones</th>
+              <th>Emitido</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="certificados-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- MI EMPRESA -->
+    <section id="view-empresa" class="view">
+      <header class="view-header">
+        <h1>Mi empresa</h1>
+        <p>Estos datos aparecen en el encabezado y pie de página de las remisiones y certificados.</p>
+      </header>
+      <form id="form-empresa" class="panel form-grid">
+        <div class="field field-full logo-row">
+          <div class="logo-preview" id="logo-preview">Logo</div>
+          <div class="field" style="flex:1;">
+            <label>Logo <span class="hint">(imagen, opcional)</span></label>
+            <input type="file" id="emp-logo" accept="image/*">
+          </div>
+        </div>
+        <div class="field">
+          <label>Razón social / nombre</label>
+          <input type="text" id="emp-nombre" placeholder="Mi Chatarrería S.A.S.">
+        </div>
+        <div class="field">
+          <label>NIT</label>
+          <input type="text" id="emp-nit" placeholder="900.000.000-0">
+        </div>
+        <div class="field">
+          <label>Dirección</label>
+          <input type="text" id="emp-direccion">
+        </div>
+        <div class="field">
+          <label>Teléfono</label>
+          <input type="text" id="emp-telefono">
+        </div>
+        <div class="field">
+          <label>Sitio web <span class="hint">(opcional)</span></label>
+          <input type="text" id="emp-web" placeholder="www.miempresa.com">
+        </div>
+        <div class="field field-full form-actions">
+          <button type="submit" class="btn btn-primary">Guardar datos de la empresa</button>
+        </div>
+      </form>
+    </section>
+
+  </main>
+</div>
+
+<!-- PRINT AREAS (hidden on screen, shown only on print) -->
+<div id="print-remision" class="print-area"></div>
+<div id="print-certificado" class="print-area"></div>
+
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
