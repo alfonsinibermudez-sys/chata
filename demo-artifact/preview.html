@@ -153,6 +153,7 @@ body {
   border-radius: var(--radius);
   padding: 18px 20px;
   margin-bottom: 20px;
+  overflow-x: auto;
 }
 .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .panel h2 { font-family: var(--font-display); font-weight: 600; font-size: 16px; margin: 0 0 12px; letter-spacing: 0.01em; }
@@ -309,6 +310,62 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--moss-soft);
 .doc-footer .doc-id { font-family: var(--font-mono); }
 
 .doc-cert-text { font-size: 13px; line-height: 1.7; margin: 18px 0; text-align: justify; }
+
+/* ===== Responsive (tablet / mobile) ===== */
+@media (max-width: 860px) {
+  .app-shell { flex-direction: column; min-height: 0; }
+
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 12px;
+    gap: 14px;
+    border-right: none;
+    border-bottom: 1px solid var(--rail-line);
+    flex-shrink: 0;
+  }
+  .brand { margin-bottom: 0; flex-shrink: 0; }
+  .brand-title { font-size: 14px; }
+  .brand-sub { display: none; }
+
+  .nav {
+    flex-direction: row;
+    flex: 1;
+    gap: 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .nav-item { white-space: nowrap; padding: 8px 10px; font-size: 12.5px; flex-shrink: 0; }
+
+  .sidebar-foot { display: none; }
+
+  .content { padding: 16px; max-width: 100%; }
+
+  .view-header { flex-direction: column; align-items: flex-start; gap: 2px; margin-bottom: 14px; }
+  .view-header h1 { font-size: 20px; }
+
+  .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .panel { padding: 14px 16px; }
+
+  .form-grid { grid-template-columns: 1fr; gap: 12px; }
+  .panel h3.subhead { grid-column: 1; }
+
+  .filters { flex-wrap: wrap; }
+  .filters > * { flex: 1 1 140px; }
+
+  .totals-row { flex-direction: column; gap: 4px; }
+  .logo-row { flex-direction: column; align-items: flex-start; }
+
+  /* Prevent iOS auto-zoom on focus and keep tap targets comfortable */
+  input, select, textarea { font-size: 16px; }
+
+  .panel-head { flex-wrap: wrap; gap: 8px; }
+}
+
+@media (max-width: 480px) {
+  .stat-grid { grid-template-columns: 1fr; }
+}
 
 .demo-note {
   position: fixed; bottom: 14px; right: 16px;
