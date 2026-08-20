@@ -680,6 +680,48 @@ document.getElementById("btn-sync-now").addEventListener("click", trySync);
 window.addEventListener("online", () => { updateSyncStatus(); trySync(); });
 window.addEventListener("offline", updateSyncStatus);
 
+// ---------- Install button ----------
+// Browsers only show their own install banner under narrow, inconsistent
+// conditions (and iOS Safari never shows one at all), so we drive install
+// from our own always-visible button instead of relying on that.
+let deferredInstallPrompt = null;
+
+function isStandaloneApp() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+function isIOS() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
+function updateInstallButton() {
+  const btn = document.getElementById("btn-install");
+  btn.style.display = (!isStandaloneApp() && (deferredInstallPrompt || isIOS())) ? "block" : "none";
+}
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  updateInstallButton();
+});
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  updateInstallButton();
+});
+
+document.getElementById("btn-install").addEventListener("click", async () => {
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    updateInstallButton();
+  } else if (isIOS()) {
+    alert('Para instalar: toca el ícono de compartir (el cuadrado con la flecha hacia arriba) en la barra de Safari, y luego "Añadir a pantalla de inicio".');
+  } else {
+    alert('Busca el ícono de instalación en la barra de direcciones, o el menú del navegador → "Instalar app".');
+  }
+});
+
 // ---------- Service worker (installable app + offline app shell) ----------
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -694,6 +736,7 @@ if ("serviceWorker" in navigator) {
     applyBrand();
     renderDashboard();
     updateSyncStatus();
+    updateInstallButton();
     trySync();
   } catch (err) {
     console.error(err);

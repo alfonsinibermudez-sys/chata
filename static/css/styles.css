@@ -129,9 +129,9 @@ body {
 .nav-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
 .nav-item.active { background: var(--moss); color: var(--moss-on); font-weight: 600; }
 
-.sidebar-foot { font-size: 11px; color: var(--rail-text-dim); padding: 10px 6px 0; border-top: 1px solid var(--rail-line); margin-top: 10px; padding-top: 12px; }
+.install-btn { margin: 10px 6px 0; }
 
-.sync-status { display: flex; align-items: center; gap: 7px; padding: 8px 6px 2px; font-size: 12px; color: var(--rail-text); }
+.sync-status { display: flex; align-items: center; gap: 7px; padding: 8px 6px 2px; font-size: 12px; color: var(--rail-text); border-top: 1px solid var(--rail-line); margin-top: 10px; padding-top: 12px; }
 .sync-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--moss); flex-shrink: 0; }
 .sync-status.offline .sync-dot { background: var(--rust); }
 .sync-status.syncing .sync-dot { background: var(--rust); animation: sync-pulse 1s ease-in-out infinite; }
@@ -339,18 +339,21 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--moss-soft);
   }
   .nav-item { white-space: nowrap; padding: 8px 10px; font-size: 12.5px; flex-shrink: 0; }
 
-  .sidebar-foot { display: none; }
-
-  /* Sync status becomes a small floating pill so it stays visible even
-     though the sidebar is now a horizontal scrolling bar with no room. */
+  /* Install button + sync status become small floating pills so they stay
+     visible even though the sidebar is now a horizontal scrolling bar with
+     no room for them in-line. */
   .sync-status {
     position: fixed; z-index: 20; bottom: 14px; right: 14px;
     background: var(--rail); border: 1px solid var(--rail-line);
-    border-radius: 999px; padding: 7px 12px;
+    border-radius: 999px; padding: 7px 12px; margin-top: 0;
     box-shadow: 0 2px 10px rgba(0,0,0,0.18);
   }
   .sync-btn {
     position: fixed; z-index: 20; bottom: 54px; right: 14px;
+    margin: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+  }
+  .install-btn {
+    position: fixed; z-index: 20; bottom: 14px; left: 14px;
     margin: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.18);
   }
 
