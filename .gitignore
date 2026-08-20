@@ -21,3 +21,6 @@ Thumbs.db
 
 # Documento de ejemplo (contiene datos de un tercero, no publicar)
 ejemplo remisión .pdf
+
+# Manual generado con datos de ejemplo (no publicar en repo público)
+docs/

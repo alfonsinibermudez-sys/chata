@@ -19,6 +19,10 @@ function generadorById(id) {
 }
 
 function showError(err) {
+  if (err instanceof NetworkError) {
+    alert("Sin conexión — esta acción necesita internet. Inténtalo de nuevo cuando vuelva la señal.");
+    return;
+  }
   alert("Ocurrió un error: " + (err && err.message ? err.message : err));
   console.error(err);
 }
@@ -98,7 +102,7 @@ document.getElementById("form-empresa").addEventListener("submit", async (e) => 
 
 // ---------- Dashboard ----------
 function renderDashboard() {
-  const remisiones = CACHE.remisiones;
+  const remisiones = allRemisiones();
   const now = new Date();
   const ym = now.toISOString().slice(0, 7);
   const delMes = remisiones.filter(r => r.fecha.slice(0, 7) === ym);
@@ -112,7 +116,7 @@ function renderDashboard() {
     <div class="stat-card"><div class="value">${pendientes.length}</div><div class="label">Pendientes de envío</div></div>
   `;
 
-  const recent = [...remisiones].sort((a, b) => b.consecutivo - a.consecutivo).slice(0, 6);
+  const recent = [...remisiones].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 6);
   if (recent.length === 0) {
     document.getElementById("dashboard-recent").innerHTML = `<div class="empty-state">Aún no hay remisiones. Crea la primera desde "Nueva remisión".</div>`;
     return;
@@ -124,7 +128,7 @@ function renderDashboard() {
         ${recent.map(r => {
           const g = generadorById(r.generador_id);
           return `<tr>
-            <td class="num">${r.consecutivo}</td>
+            <td class="num">${r.consecutivo ?? "—"}</td>
             <td class="num">${fmtDate(r.fecha)}</td>
             <td>${g ? g.nombre : "—"}</td>
             <td class="num">${fmtKg(totalKgRemision(r))} kg</td>
@@ -137,9 +141,9 @@ function renderDashboard() {
 }
 
 function estadoBadge(estado) {
-  return estado === "enviada"
-    ? `<span class="badge badge-enviada">Enviada</span>`
-    : `<span class="badge badge-pendiente">Pendiente</span>`;
+  if (estado === "enviada") return `<span class="badge badge-enviada">Enviada</span>`;
+  if (estado === "pendiente_sync") return `<span class="badge badge-sync">Sin sincronizar</span>`;
+  return `<span class="badge badge-pendiente">Pendiente</span>`;
 }
 
 function totalKgRemision(r) {
@@ -311,7 +315,20 @@ document.getElementById("form-remision").addEventListener("submit", async (e) =>
     await refreshRemisiones();
     alert(`Remisión N.° ${remision.consecutivo} guardada.`);
     setView("remisiones");
-  } catch (err) { showError(err); }
+  } catch (err) {
+    if (err instanceof NetworkError) {
+      await Queue.add({ local_id: newLocalId(), payload, created_at: new Date().toISOString() });
+      await refreshPending();
+      e.target.reset();
+      document.getElementById("materiales-body").innerHTML = "";
+      addMaterialRow();
+      updateSyncStatus();
+      alert("Sin conexión: la remisión quedó guardada en este dispositivo y se enviará sola cuando vuelva el internet.");
+      setView("remisiones");
+      return;
+    }
+    showError(err);
+  }
 });
 
 // ---------- Remisiones list ----------
@@ -321,11 +338,11 @@ function renderRemisiones() {
   const mesFilter = document.getElementById("filter-mes").value;
   const estadoFilter = document.getElementById("filter-estado").value;
 
-  let list = CACHE.remisiones;
+  let list = allRemisiones();
   if (genFilter) list = list.filter(r => String(r.generador_id) === genFilter);
   if (mesFilter) list = list.filter(r => r.fecha.slice(0, 7) === mesFilter);
   if (estadoFilter) list = list.filter(r => r.estado === estadoFilter);
-  list = [...list].sort((a, b) => b.consecutivo - a.consecutivo);
+  list = [...list].sort((a, b) => b.created_at.localeCompare(a.created_at));
 
   const body = document.getElementById("remisiones-body");
   if (list.length === 0) {
@@ -334,17 +351,18 @@ function renderRemisiones() {
   }
   body.innerHTML = list.map(r => {
     const g = generadorById(r.generador_id);
+    const idArg = r._pending ? `'${r.id}'` : r.id;
     return `<tr>
-      <td class="num">${r.consecutivo}</td>
+      <td class="num">${r.consecutivo ?? "—"}</td>
       <td class="num">${fmtDate(r.fecha)}</td>
       <td>${g ? g.nombre : "—"}</td>
       <td class="num">${fmtKg(totalKgRemision(r))} kg</td>
       <td class="num">${fmtCOP(totalValorRemision(r))}</td>
       <td>${estadoBadge(r.estado)}</td>
       <td class="row-actions">
-        <button class="btn btn-secondary btn-sm" onclick="printRemision(${r.id})">Imprimir / PDF</button>
-        ${r.estado === "pendiente" ? `<button class="btn btn-primary btn-sm" onclick="marcarEnviada(${r.id})">Marcar enviada</button>` : ""}
-        <button class="btn btn-danger btn-sm" onclick="removeRemision(${r.id})">Eliminar</button>
+        <button class="btn btn-secondary btn-sm" onclick="printRemision(${idArg})">Imprimir / PDF</button>
+        ${r.estado === "pendiente" ? `<button class="btn btn-primary btn-sm" onclick="marcarEnviada(${idArg})">Marcar enviada</button>` : ""}
+        <button class="btn btn-danger btn-sm" onclick="removeRemision(${idArg})">Eliminar</button>
       </td>
     </tr>`;
   }).join("");
@@ -363,6 +381,14 @@ async function marcarEnviada(id) {
 }
 async function removeRemision(id) {
   if (!confirm("¿Eliminar esta remisión?")) return;
+  if (typeof id === "string" && id.startsWith("local-")) {
+    await Queue.remove(id);
+    await refreshPending();
+    renderRemisiones();
+    renderDashboard();
+    updateSyncStatus();
+    return;
+  }
   try {
     await apiDelete(`/remisiones/${id}`);
     await refreshRemisiones();
@@ -384,7 +410,7 @@ function timeLabel(hhmm, fecha) {
 }
 
 function printRemision(id) {
-  const r = CACHE.remisiones.find(x => x.id === id);
+  const r = allRemisiones().find(x => x.id === id);
   if (!r) return;
   const g = generadorById(r.generador_id);
   const emp = CACHE.empresa || {};
@@ -415,7 +441,7 @@ function printRemision(id) {
         </div>
         <div class="doc-doctype">
           <div class="label">Manifiesto de carga</div>
-          <div class="num">N.° ${r.consecutivo}</div>
+          <div class="num">${r._pending ? "Sin sincronizar" : "N.° " + r.consecutivo}</div>
         </div>
       </div>
       <div class="doc-gen-meta">Documento generado ${now.toLocaleDateString("es-CO")} ${now.toLocaleTimeString("es-CO")}${emp.web ? " · " + emp.web : ""}</div>
@@ -491,6 +517,8 @@ document.getElementById("btn-generar-cert").addEventListener("click", async () =
   const generadorId = document.getElementById("cert-generador").value;
   const mesValue = document.getElementById("cert-mes").value; // yyyy-mm
   if (!generadorId || !mesValue) { alert("Selecciona generador y mes."); return; }
+  if (!navigator.onLine) { alert("Los certificados necesitan conexión, porque el servidor suma las remisiones ya sincronizadas. Conéctate e inténtalo de nuevo."); return; }
+  if (CACHE.pending.length > 0) { alert("Tienes remisiones sin sincronizar. Sincronízalas primero para que el certificado quede completo."); return; }
 
   try {
     const cert = await apiPost("/certificados/generar", { generador_id: parseInt(generadorId, 10), mes: mesValue });
@@ -605,12 +633,65 @@ function printCertificado(id) {
   window.print();
 }
 
+// ---------- Sync status ----------
+let syncing = false;
+
+function updateSyncStatus() {
+  const el = document.getElementById("sync-status");
+  const dot = document.getElementById("sync-dot");
+  const text = document.getElementById("sync-text");
+  const btn = document.getElementById("btn-sync-now");
+  const pendingCount = CACHE.pending.length;
+
+  el.classList.remove("offline", "syncing");
+  if (syncing) {
+    el.classList.add("syncing");
+    text.textContent = `Sincronizando ${pendingCount} remisión(es)…`;
+  } else if (!navigator.onLine) {
+    el.classList.add("offline");
+    text.textContent = pendingCount > 0 ? `Sin conexión · ${pendingCount} por sincronizar` : "Sin conexión";
+  } else if (pendingCount > 0) {
+    el.classList.add("offline");
+    text.textContent = `Conectado · ${pendingCount} por sincronizar`;
+  } else {
+    text.textContent = "Conectado";
+  }
+  btn.style.display = (!syncing && navigator.onLine && pendingCount > 0) ? "block" : "none";
+}
+
+async function trySync() {
+  if (syncing || !navigator.onLine || CACHE.pending.length === 0) return;
+  syncing = true;
+  updateSyncStatus();
+  const result = await syncPending();
+  syncing = false;
+  updateSyncStatus();
+  if (result.synced > 0) {
+    renderDashboard();
+    renderRemisiones();
+  }
+  return result;
+}
+
+document.getElementById("btn-sync-now").addEventListener("click", trySync);
+window.addEventListener("online", () => { updateSyncStatus(); trySync(); });
+window.addEventListener("offline", updateSyncStatus);
+
+// ---------- Service worker (installable app + offline app shell) ----------
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch((err) => console.error("[SW] registro falló", err));
+  });
+}
+
 // ---------- Init ----------
 (async function init() {
   try {
     await loadAll();
     applyBrand();
     renderDashboard();
+    updateSyncStatus();
+    trySync();
   } catch (err) {
     console.error(err);
     document.querySelector(".content").innerHTML = `<div class="panel"><p>No se pudo conectar con el servidor. ¿Está corriendo la API?</p><p style="color:#888;font-size:12px;">${err.message}</p></div>`;
