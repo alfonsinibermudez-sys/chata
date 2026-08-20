@@ -53,3 +53,12 @@ def generar_certificado(payload: CertificadoGenerar):
     )
     logger.info(f"[Certificados] Generado generador={payload.generador_id} periodo={payload.mes}")
     return row
+
+
+@router.delete("/{certificado_id}")
+def delete_certificado(certificado_id: int):
+    row = execute("DELETE FROM certificados WHERE id = %s RETURNING id", (certificado_id,), fetchone=True)
+    if not row:
+        raise HTTPException(status_code=404, detail="Certificado no encontrado")
+    logger.info(f"[Certificados] Eliminado: {certificado_id}")
+    return {"ok": True}

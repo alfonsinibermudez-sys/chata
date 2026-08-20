@@ -516,9 +516,21 @@ function renderCertificados() {
       <td class="num">${fmtKg(c.total_kg)} kg</td>
       <td class="num">${c.remision_ids.length}</td>
       <td class="num">${fmtDate(c.fecha_emision)}</td>
-      <td><button class="btn btn-secondary btn-sm" onclick="printCertificado(${c.id})">Imprimir / PDF</button></td>
+      <td class="row-actions">
+        <button class="btn btn-secondary btn-sm" onclick="printCertificado(${c.id})">Imprimir / PDF</button>
+        <button class="btn btn-danger btn-sm" onclick="removeCertificado(${c.id})">Eliminar</button>
+      </td>
     </tr>`;
   }).join("");
+}
+
+async function removeCertificado(id) {
+  if (!confirm("¿Eliminar este certificado?")) return;
+  try {
+    await apiDelete(`/certificados/${id}`);
+    await refreshCertificados();
+    renderCertificados();
+  } catch (err) { showError(err); }
 }
 
 function printCertificado(id) {
