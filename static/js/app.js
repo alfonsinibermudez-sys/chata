@@ -150,7 +150,10 @@ function totalKgRemision(r) {
   return r.materiales.reduce((s, m) => s + (parseFloat(m.cantidad) || 0), 0);
 }
 function totalValorRemision(r) {
-  return r.materiales.reduce((s, m) => s + (parseFloat(m.valor_total) || 0), 0);
+  return r.materiales.reduce((s, m) => {
+    const vt = m.valor_total != null ? parseFloat(m.valor_total) : (parseFloat(m.cantidad) || 0) * (parseFloat(m.valor_unitario) || 0);
+    return s + (vt || 0);
+  }, 0);
 }
 
 // ---------- Generadores ----------
