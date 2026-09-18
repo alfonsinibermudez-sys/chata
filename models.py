@@ -62,6 +62,10 @@ class ProductoOut(ProductoIn):
 # ---------- Operadores (quién recolecta, para "Modo operador") ----------
 class OperadorIn(BaseModel):
     nombre: str
+    cedula: str = ""
+    vehiculo: str = ""
+    placa: str = ""
+    firma: str = ""
     activo: bool = True
 
 
@@ -107,6 +111,7 @@ class RemisionCreate(BaseModel):
     observaciones: str = ""
     responsable_cliente: str = ""
     firma_cliente: str = ""
+    firma_responsable: str = ""
     materiales: list[MaterialIn] = Field(default_factory=list)
 
 
@@ -128,6 +133,7 @@ class RemisionOut(BaseModel):
     observaciones: str
     responsable_cliente: str
     firma_cliente: str = ""
+    firma_responsable: str = ""
     estado: str
     created_at: datetime
     enviada_at: Optional[datetime] = None

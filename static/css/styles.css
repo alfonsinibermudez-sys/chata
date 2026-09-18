@@ -562,6 +562,8 @@ body.op-en-materiales .op-ticket-bar { display: flex; }
 .op-resumen-item .icon { font-size: 22px; }
 .op-resumen-item .nombre { flex: 1; font-weight: 600; }
 .op-resumen-item .cant { font-family: var(--font-mono); font-weight: 600; }
+.op-resumen-total { border-top: 2px solid var(--line); border-bottom: none; margin-top: 4px; padding-top: 12px; font-size: 16px; }
+.op-resumen-total .nombre, .op-resumen-total .cant { font-weight: 700; color: var(--moss-dark); }
 .op-extra-fields { display: flex; flex-direction: column; gap: 14px; margin-bottom: 22px; max-width: 420px; }
 .op-firma-canvas {
   width: 100%; max-width: 420px; height: 160px; touch-action: none;

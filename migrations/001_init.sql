@@ -107,19 +107,36 @@ CREATE TABLE IF NOT EXISTS productos (
 );
 CREATE INDEX IF NOT EXISTS idx_productos_categoria ON productos(categoria);
 
--- Operadores de recolección (quién usa "Modo operador"), para que la
--- remisión quede con el nombre de quien recolectó sin que tenga que escribirlo.
+-- Operadores de recolección (quién usa "Modo operador"): guardan su cédula,
+-- vehículo/placa habituales y su firma una sola vez al registrarse, para que
+-- la remisión se autocomplete sin que el operador tenga que escribir nada
+-- (la placa igual se puede corregir ese día si le tocó otro vehículo).
 CREATE TABLE IF NOT EXISTS operadores (
     id SERIAL PRIMARY KEY,
     nombre TEXT NOT NULL,
+    cedula TEXT NOT NULL DEFAULT '',
+    vehiculo TEXT NOT NULL DEFAULT '',
+    placa TEXT NOT NULL DEFAULT '',
+    firma TEXT NOT NULL DEFAULT '',
     activo BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- `operadores` ya se desplegó sin estas columnas, así que hacen falta los
+-- ALTER explícitos además del CREATE TABLE de arriba (que no las agrega si
+-- la tabla ya existe).
+ALTER TABLE operadores ADD COLUMN IF NOT EXISTS cedula TEXT NOT NULL DEFAULT '';
+ALTER TABLE operadores ADD COLUMN IF NOT EXISTS vehiculo TEXT NOT NULL DEFAULT '';
+ALTER TABLE operadores ADD COLUMN IF NOT EXISTS placa TEXT NOT NULL DEFAULT '';
+ALTER TABLE operadores ADD COLUMN IF NOT EXISTS firma TEXT NOT NULL DEFAULT '';
 
 -- Firma táctil de quien recibe la recolección, capturada en "Modo operador"
--- (imagen PNG en base64). `remisiones` ya existe en producción, así que el
--- CREATE TABLE de arriba no la toca: hace falta este ALTER explícito.
+-- (imagen PNG en base64), y firma del operador copiada de su perfil al
+-- momento de crear la remisión (para que quede el registro histórico aunque
+-- el operador cambie su firma después). `remisiones` ya existe en
+-- producción, así que el CREATE TABLE de arriba no la toca: hacen falta
+-- estos ALTER explícitos.
 ALTER TABLE remisiones ADD COLUMN IF NOT EXISTS firma_cliente TEXT NOT NULL DEFAULT '';
+ALTER TABLE remisiones ADD COLUMN IF NOT EXISTS firma_responsable TEXT NOT NULL DEFAULT '';
 
 -- Catálogo inicial (solo la primera vez que la tabla está vacía) para que el
 -- modo operador tenga algo que mostrar desde el primer arranque; el

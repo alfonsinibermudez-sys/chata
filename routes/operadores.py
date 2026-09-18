@@ -24,8 +24,9 @@ def list_operadores(activo: Optional[bool] = None):
 @router.post("/", response_model=OperadorOut)
 def create_operador(o: OperadorIn):
     row = execute(
-        "INSERT INTO operadores (nombre, activo) VALUES (%s, %s) RETURNING *",
-        (o.nombre, o.activo),
+        """INSERT INTO operadores (nombre, cedula, vehiculo, placa, firma, activo)
+           VALUES (%s, %s, %s, %s, %s, %s) RETURNING *""",
+        (o.nombre, o.cedula, o.vehiculo, o.placa, o.firma, o.activo),
         fetchone=True,
     )
     logger.info(f"[Operadores] Creado: {o.nombre}")
@@ -35,8 +36,9 @@ def create_operador(o: OperadorIn):
 @router.put("/{operador_id}", response_model=OperadorOut)
 def update_operador(operador_id: int, o: OperadorIn):
     row = execute(
-        "UPDATE operadores SET nombre=%s, activo=%s WHERE id=%s RETURNING *",
-        (o.nombre, o.activo, operador_id),
+        """UPDATE operadores SET nombre=%s, cedula=%s, vehiculo=%s, placa=%s, firma=%s, activo=%s
+           WHERE id=%s RETURNING *""",
+        (o.nombre, o.cedula, o.vehiculo, o.placa, o.firma, o.activo, operador_id),
         fetchone=True,
     )
     if not row:

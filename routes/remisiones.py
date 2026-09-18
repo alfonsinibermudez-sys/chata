@@ -80,14 +80,14 @@ def create_remision(r: RemisionCreate):
                      consecutivo, fecha, generador_id, vehiculo, placa,
                      conductor_nombre, conductor_cedula, auxiliar_nombre, auxiliar_cedula,
                      responsable, destino, hora_llegada, hora_salida,
-                     observaciones, responsable_cliente, firma_cliente, estado
-                   ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pendiente')
+                     observaciones, responsable_cliente, firma_cliente, firma_responsable, estado
+                   ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pendiente')
                    RETURNING *""",
                 (
                     consecutivo, r.fecha, r.generador_id, r.vehiculo, r.placa,
                     r.conductor_nombre, r.conductor_cedula, r.auxiliar_nombre, r.auxiliar_cedula,
                     r.responsable, r.destino, r.hora_llegada, r.hora_salida,
-                    r.observaciones, r.responsable_cliente, r.firma_cliente,
+                    r.observaciones, r.responsable_cliente, r.firma_cliente, r.firma_responsable,
                 ),
             )
             remision = dict(cur.fetchone())

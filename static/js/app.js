@@ -245,7 +245,7 @@ function renderProductos() {
         <div class="prod-row ${p.activo ? "" : "inactivo"}">
           <span class="icon">${p.icono || "📦"}</span>
           <span class="nombre">${p.nombre}</span>
-          <span class="unidad">${p.unidad}</span>
+          <span class="unidad">${fmtCOP(p.valor_unitario)}/${p.unidad}</span>
           <div class="row-actions">
             <button type="button" class="btn btn-secondary btn-sm" onclick="editProducto(${p.id})">Editar</button>
             <button type="button" class="btn btn-secondary btn-sm" onclick="toggleProductoActivo(${p.id})">${p.activo ? "Desactivar" : "Activar"}</button>
@@ -266,6 +266,7 @@ function editProducto(id) {
   document.getElementById("prod-nombre").value = p.nombre;
   document.getElementById("prod-icono").value = p.icono;
   document.getElementById("prod-unidad").value = p.unidad;
+  document.getElementById("prod-valor").value = p.valor_unitario;
   document.getElementById("btn-prod-guardar").textContent = "Guardar cambios";
   document.getElementById("btn-prod-cancelar").style.display = "inline-block";
   document.getElementById("prod-categoria").scrollIntoView({ behavior: "smooth", block: "center" });
@@ -288,7 +289,7 @@ document.getElementById("form-producto").addEventListener("submit", async (e) =>
     nombre: document.getElementById("prod-nombre").value.trim(),
     icono: document.getElementById("prod-icono").value.trim() || "📦",
     unidad: document.getElementById("prod-unidad").value,
-    valor_unitario: existing ? existing.valor_unitario : 0,
+    valor_unitario: parseFloat(document.getElementById("prod-valor").value) || 0,
     orden: existing ? existing.orden : 0,
     activo: existing ? existing.activo : true,
   };
@@ -336,6 +337,7 @@ function renderOperadores() {
   panel.innerHTML = list.map(o => `
     <div class="prod-row ${o.activo ? "" : "inactivo"}">
       <span class="nombre">${o.nombre}</span>
+      <span class="unidad">${[o.cedula, o.placa].filter(Boolean).join(" · ") || "—"}</span>
       <div class="row-actions">
         <button type="button" class="btn btn-secondary btn-sm" onclick="editOperador(${o.id})">Editar</button>
         <button type="button" class="btn btn-secondary btn-sm" onclick="toggleOperadorActivo(${o.id})">${o.activo ? "Desactivar" : "Activar"}</button>
@@ -351,6 +353,11 @@ function editOperador(id) {
   editingOperadorId = id;
   document.getElementById("oper-id").value = id;
   document.getElementById("oper-nombre").value = o.nombre;
+  document.getElementById("oper-cedula").value = o.cedula || "";
+  document.getElementById("oper-vehiculo").value = o.vehiculo || "";
+  document.getElementById("oper-placa").value = o.placa || "";
+  operFirmaClear();
+  document.getElementById("oper-firma-existente").style.display = o.firma ? "inline" : "none";
   document.getElementById("btn-oper-guardar").textContent = "Guardar cambios";
   document.getElementById("btn-oper-cancelar").style.display = "inline-block";
 }
@@ -359,16 +366,65 @@ function cancelEditOperador() {
   editingOperadorId = null;
   document.getElementById("form-operador").reset();
   document.getElementById("oper-id").value = "";
+  operFirmaClear();
+  document.getElementById("oper-firma-existente").style.display = "none";
   document.getElementById("btn-oper-guardar").textContent = "+ Agregar operador";
   document.getElementById("btn-oper-cancelar").style.display = "none";
 }
 document.getElementById("btn-oper-cancelar").addEventListener("click", cancelEditOperador);
+
+// ---- Firma de referencia del operador (se registra una sola vez) ----
+const operFirmaCanvas = document.getElementById("oper-firma-canvas");
+const operFirmaCtx = operFirmaCanvas.getContext("2d");
+operFirmaCtx.lineWidth = 3;
+operFirmaCtx.lineCap = "round";
+operFirmaCtx.lineJoin = "round";
+operFirmaCtx.strokeStyle = "#1a211c";
+let operFirmaDrawing = false;
+let operFirmaHasContent = false;
+
+function operFirmaPos(evt) {
+  const rect = operFirmaCanvas.getBoundingClientRect();
+  return {
+    x: (evt.clientX - rect.left) * (operFirmaCanvas.width / rect.width),
+    y: (evt.clientY - rect.top) * (operFirmaCanvas.height / rect.height),
+  };
+}
+operFirmaCanvas.addEventListener("pointerdown", (e) => {
+  operFirmaDrawing = true;
+  const p = operFirmaPos(e);
+  operFirmaCtx.beginPath();
+  operFirmaCtx.moveTo(p.x, p.y);
+  e.preventDefault();
+});
+operFirmaCanvas.addEventListener("pointermove", (e) => {
+  if (!operFirmaDrawing) return;
+  const p = operFirmaPos(e);
+  operFirmaCtx.lineTo(p.x, p.y);
+  operFirmaCtx.stroke();
+  operFirmaHasContent = true;
+  e.preventDefault();
+});
+window.addEventListener("pointerup", () => { operFirmaDrawing = false; });
+document.getElementById("btn-oper-firma-limpiar").addEventListener("click", () => {
+  operFirmaClear();
+  document.getElementById("oper-firma-existente").style.display = "none";
+});
+
+function operFirmaClear() {
+  operFirmaCtx.clearRect(0, 0, operFirmaCanvas.width, operFirmaCanvas.height);
+  operFirmaHasContent = false;
+}
 
 document.getElementById("form-operador").addEventListener("submit", async (e) => {
   e.preventDefault();
   const existing = editingOperadorId ? CACHE.operadores.find(x => x.id === editingOperadorId) : null;
   const payload = {
     nombre: document.getElementById("oper-nombre").value.trim(),
+    cedula: document.getElementById("oper-cedula").value.trim(),
+    vehiculo: document.getElementById("oper-vehiculo").value.trim(),
+    placa: document.getElementById("oper-placa").value.trim(),
+    firma: operFirmaHasContent ? operFirmaCanvas.toDataURL("image/png") : (existing ? existing.firma : ""),
     activo: existing ? existing.activo : true,
   };
   try {
@@ -682,7 +738,7 @@ function printRemision(id) {
       <div class="doc-signatures">
         <div class="doc-signature">
           <div class="role">Responsable ${emp.nombre || ""}</div>
-          ${r.responsable || ""}
+          ${r.firma_responsable ? `<img src="${r.firma_responsable}" style="max-width:180px;max-height:60px;display:block;margin:0 auto 4px;">` : ""}${r.responsable || ""}
         </div>
         <div class="doc-signature">
           <div class="role">Responsable cliente</div>
@@ -932,7 +988,10 @@ function setModo(modo) {
 document.getElementById("btn-modo-operador").addEventListener("click", () => setModo("operador"));
 document.getElementById("btn-modo-admin").addEventListener("click", () => setModo("admin"));
 
-const opState = { operadorId: null, operadorNombre: "", clienteId: null, categoriaActiva: null, items: [] };
+const opState = {
+  operadorId: null, operadorNombre: "", operadorCedula: "", operadorVehiculo: "", operadorPlaca: "", operadorFirma: "",
+  clienteId: null, categoriaActiva: null, items: [],
+};
 
 function opBrand() {
   const e = CACHE.empresa || {};
@@ -965,6 +1024,10 @@ function initOperador() {
   opBrand();
   opState.operadorId = null;
   opState.operadorNombre = "";
+  opState.operadorCedula = "";
+  opState.operadorVehiculo = "";
+  opState.operadorPlaca = "";
+  opState.operadorFirma = "";
   opState.clienteId = null;
   opState.categoriaActiva = null;
   opState.items = [];
@@ -1005,6 +1068,10 @@ function opSeleccionarOperador(id) {
   if (!o) return;
   opState.operadorId = id;
   opState.operadorNombre = o.nombre;
+  opState.operadorCedula = o.cedula || "";
+  opState.operadorVehiculo = o.vehiculo || "";
+  opState.operadorPlaca = o.placa || "";
+  opState.operadorFirma = o.firma || "";
   opUpdateOperadorChip();
   renderOpClientes();
   opSetStep("cliente", true);
@@ -1211,6 +1278,7 @@ document.getElementById("btn-op-volver-materiales").addEventListener("click", ()
 // ---- Paso 3: confirmar ----
 function renderOpConfirmar() {
   const g = generadorById(opState.clienteId);
+  const totalValor = opState.items.reduce((s, i) => s + (i.cantidad * (i.valor_unitario || 0)), 0);
   document.getElementById("op-resumen").innerHTML = `
     <div class="op-resumen-cliente">${g ? g.nombre : "—"}</div>
     ${opState.items.map(i => `
@@ -1220,8 +1288,13 @@ function renderOpConfirmar() {
         <span class="cant">${fmtKg(i.cantidad)} ${i.unidad}</span>
       </div>
     `).join("")}
+    <div class="op-resumen-item op-resumen-total">
+      <span class="nombre">Total</span>
+      <span class="cant">${fmtCOP(totalValor)}</span>
+    </div>
   `;
-  document.getElementById("op-placa").value = "";
+  document.getElementById("op-placa").value = opState.operadorPlaca;
+  document.getElementById("op-vehiculo-hint").textContent = opState.operadorVehiculo ? `(${opState.operadorVehiculo})` : "(opcional)";
   document.getElementById("op-observaciones").value = "";
   opFirmaClear();
 }
@@ -1271,9 +1344,13 @@ document.getElementById("btn-op-guardar").addEventListener("click", async () => 
     fecha: new Date().toISOString().slice(0, 10),
     generador_id: opState.clienteId,
     responsable: opState.operadorNombre,
+    conductor_nombre: opState.operadorNombre,
+    conductor_cedula: opState.operadorCedula,
+    vehiculo: opState.operadorVehiculo,
     placa: document.getElementById("op-placa").value.trim(),
     observaciones: document.getElementById("op-observaciones").value.trim(),
     firma_cliente: opFirmaHasContent ? opFirmaCanvas.toDataURL("image/png") : "",
+    firma_responsable: opState.operadorFirma,
     materiales: opState.items.map(i => ({
       nombre: i.nombre,
       estado: "Sólido",

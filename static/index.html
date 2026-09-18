@@ -288,6 +288,10 @@
               <option value="unidad">unidad</option>
             </select>
           </div>
+          <div class="field">
+            <label>Valor unitario <span class="hint">(precio por unidad, uso interno)</span></label>
+            <input type="number" id="prod-valor" min="0" step="1" value="0">
+          </div>
           <div class="field form-actions">
             <button type="button" class="btn btn-ghost" id="btn-prod-cancelar" style="display:none;">Cancelar edición</button>
             <button type="submit" class="btn btn-primary" id="btn-prod-guardar">+ Agregar producto</button>
@@ -301,7 +305,7 @@
     <section id="view-operadores" class="view">
       <header class="view-header">
         <h1>Operadores</h1>
-        <p>Personas que recolectan en sitio y usan "Modo operador". Aparecen como opción al abrir ese modo.</p>
+        <p>Personas que recolectan en sitio y usan "Modo operador". Sus datos autocompletan la remisión (la placa se puede corregir el día que usen otro vehículo).</p>
       </header>
       <div class="panel">
         <form id="form-operador" class="form-grid">
@@ -309,6 +313,26 @@
           <div class="field">
             <label>Nombre completo</label>
             <input type="text" id="oper-nombre" placeholder="Ej: Juan Pérez" required>
+          </div>
+          <div class="field">
+            <label>Cédula</label>
+            <input type="text" id="oper-cedula" placeholder="Número de cédula">
+          </div>
+          <div class="field">
+            <label>Vehículo <span class="hint">(opcional)</span></label>
+            <input type="text" id="oper-vehiculo" placeholder="Ej: Foton blanco">
+          </div>
+          <div class="field">
+            <label>Placa habitual <span class="hint">(opcional)</span></label>
+            <input type="text" id="oper-placa" placeholder="ABC123">
+          </div>
+          <div class="field field-full">
+            <label>Firma <span class="hint">(se registra una sola vez y queda en cada remisión que haga)</span></label>
+            <canvas id="oper-firma-canvas" class="op-firma-canvas" width="600" height="220"></canvas>
+            <div class="row-actions" style="margin-top:6px;">
+              <button type="button" class="btn btn-ghost btn-sm" id="btn-oper-firma-limpiar">Volver a firmar</button>
+              <span class="hint" id="oper-firma-existente" style="display:none;">Ya tiene una firma guardada — solo se reemplaza si dibuja una nueva.</span>
+            </div>
           </div>
           <div class="field form-actions">
             <button type="button" class="btn btn-ghost" id="btn-oper-cancelar" style="display:none;">Cancelar edición</button>
@@ -439,7 +463,7 @@
     <div class="op-resumen" id="op-resumen"></div>
     <div class="op-extra-fields">
       <div class="field">
-        <label>Placa del vehículo <span class="hint">(opcional)</span></label>
+        <label>Placa del vehículo <span class="hint" id="op-vehiculo-hint"></span></label>
         <input type="text" id="op-placa" placeholder="ABC123">
       </div>
       <div class="field">
