@@ -19,8 +19,10 @@ env/
 .DS_Store
 Thumbs.db
 
-# Documento de ejemplo (contiene datos de un tercero, no publicar)
+# Documentos de ejemplo/prueba (contienen datos reales de la empresa o de
+# un tercero, no publicar)
 ejemplo remisión .pdf
+Remisiones Chatarrería.pdf
 
 # Manual generado con datos de ejemplo (no publicar en repo público)
 docs/

@@ -18,6 +18,20 @@ function generadorById(id) {
   return CACHE.generadores.find(g => g.id === id);
 }
 
+// Firma/logo van como <img src="data:..."> recién insertados en el DOM, así
+// que aún no terminaron de decodificar cuando window.print() se llama justo
+// después de fijar innerHTML — sin esto, el navegador a veces los imprime en
+// blanco (el texto sí sale porque no necesita decodificar nada).
+function printWhenImagesReady(container) {
+  const imgs = [...container.querySelectorAll("img")];
+  const ready = imgs.map(img => img.complete ? Promise.resolve() : new Promise(resolve => {
+    img.addEventListener("load", resolve, { once: true });
+    img.addEventListener("error", resolve, { once: true });
+  }));
+  Promise.race([Promise.all(ready), new Promise(resolve => setTimeout(resolve, 1500))])
+    .then(() => window.print());
+}
+
 function showError(err) {
   if (err instanceof NetworkError) {
     alert("Sin conexión — esta acción necesita internet. Inténtalo de nuevo cuando vuelva la señal.");
@@ -752,8 +766,9 @@ function printRemision(id) {
       </div>
     </div>
   `;
-  document.getElementById("print-remision").innerHTML = html;
-  window.print();
+  const printArea = document.getElementById("print-remision");
+  printArea.innerHTML = html;
+  printWhenImagesReady(printArea);
 }
 
 // ---------- Certificados ----------
@@ -873,8 +888,9 @@ function printCertificado(id) {
       </div>
     </div>
   `;
-  document.getElementById("print-certificado").innerHTML = html;
-  window.print();
+  const printArea = document.getElementById("print-certificado");
+  printArea.innerHTML = html;
+  printWhenImagesReady(printArea);
 }
 
 // ---------- Sync status ----------
