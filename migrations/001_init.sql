@@ -89,3 +89,46 @@ CREATE TABLE IF NOT EXISTS audit_log (
     details TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Catálogo de productos/materiales que el operador puede elegir en el modo
+-- visual de recolección, agrupados por categoría. No tiene FK desde
+-- `materiales`: cada material sigue guardando sus propios datos (mismo
+-- patrón que el resto de la app), el catálogo solo alimenta la pantalla.
+CREATE TABLE IF NOT EXISTS productos (
+    id SERIAL PRIMARY KEY,
+    categoria TEXT NOT NULL,
+    nombre TEXT NOT NULL,
+    icono TEXT NOT NULL DEFAULT '📦',
+    unidad TEXT NOT NULL DEFAULT 'kg',
+    valor_unitario NUMERIC(14,2) NOT NULL DEFAULT 0,
+    orden INTEGER NOT NULL DEFAULT 0,
+    activo BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_productos_categoria ON productos(categoria);
+
+-- Catálogo inicial (solo la primera vez que la tabla está vacía) para que el
+-- modo operador tenga algo que mostrar desde el primer arranque; el
+-- administrador lo edita luego desde "Productos".
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM productos) THEN
+        INSERT INTO productos (categoria, nombre, icono, orden) VALUES
+            ('Metales', 'Chatarra ferrosa', '🔩', 1),
+            ('Metales', 'Aluminio', '🥫', 2),
+            ('Metales', 'Cobre', '🟠', 3),
+            ('Metales', 'Bronce', '🟤', 4),
+            ('Metales', 'Acero inoxidable', '⚙️', 5),
+            ('Metales', 'Cable eléctrico', '🔌', 6),
+            ('Papel y cartón', 'Cartón', '📦', 1),
+            ('Papel y cartón', 'Papel de archivo', '📄', 2),
+            ('Papel y cartón', 'Periódico', '📰', 3),
+            ('Plástico', 'Plástico PET (botellas)', '🧴', 1),
+            ('Plástico', 'Plástico duro', '🪣', 2),
+            ('Vidrio', 'Vidrio', '🍾', 1),
+            ('Electrónicos', 'Chatarra electrónica', '💻', 1),
+            ('Electrónicos', 'Baterías', '🔋', 2),
+            ('Otros', 'Madera', '🪵', 1),
+            ('Otros', 'Otro material', '❓', 2);
+    END IF;
+END $$;

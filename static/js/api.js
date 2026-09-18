@@ -31,25 +31,28 @@ const apiDelete = (path) => apiRequest("DELETE", path);
 // In-memory cache: render functions read from here synchronously; mutations
 // go through the API and then refresh the relevant slice + re-render.
 // CACHE.pending holds remisiones created offline, not yet synced to the server.
-const CACHE = { empresa: {}, generadores: [], remisiones: [], certificados: [], pending: [] };
+const CACHE = { empresa: {}, generadores: [], remisiones: [], certificados: [], productos: [], pending: [] };
 
 async function loadAll() {
   try {
-    const [empresa, generadores, remisiones, certificados] = await Promise.all([
+    const [empresa, generadores, remisiones, certificados, productos] = await Promise.all([
       apiGet("/empresa/"),
       apiGet("/generadores/"),
       apiGet("/remisiones/"),
       apiGet("/certificados/"),
+      apiGet("/productos/"),
     ]);
     CACHE.empresa = empresa;
     CACHE.generadores = generadores;
     CACHE.remisiones = remisiones;
     CACHE.certificados = certificados;
+    CACHE.productos = productos;
     await Promise.all([
       Cache.set("empresa", empresa),
       Cache.set("generadores", generadores),
       Cache.set("remisiones", remisiones),
       Cache.set("certificados", certificados),
+      Cache.set("productos", productos),
     ]);
   } catch (e) {
     if (!(e instanceof NetworkError)) throw e;
@@ -58,6 +61,7 @@ async function loadAll() {
     CACHE.generadores = (await Cache.get("generadores")) || [];
     CACHE.remisiones = (await Cache.get("remisiones")) || [];
     CACHE.certificados = (await Cache.get("certificados")) || [];
+    CACHE.productos = (await Cache.get("productos")) || [];
   }
   await refreshPending();
 }
@@ -65,6 +69,10 @@ async function loadAll() {
 async function refreshGeneradores() {
   CACHE.generadores = await apiGet("/generadores/");
   await Cache.set("generadores", CACHE.generadores);
+}
+async function refreshProductos() {
+  CACHE.productos = await apiGet("/productos/");
+  await Cache.set("productos", CACHE.productos);
 }
 async function refreshRemisiones() {
   CACHE.remisiones = await apiGet("/remisiones/");

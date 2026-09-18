@@ -33,9 +33,11 @@
       <button class="nav-item" data-view="nueva-remision">Nueva remisión</button>
       <button class="nav-item" data-view="remisiones">Remisiones</button>
       <button class="nav-item" data-view="generadores">Generadores</button>
+      <button class="nav-item" data-view="productos">Productos</button>
       <button class="nav-item" data-view="certificados">Certificados</button>
       <button class="nav-item" data-view="empresa">Mi empresa</button>
     </nav>
+    <button class="btn btn-secondary btn-sm modo-toggle-btn" id="btn-modo-operador">🧑‍🔧 Modo operador (recolección)</button>
     <button class="btn btn-primary btn-sm install-btn" id="btn-install" style="display:none;">Instalar app</button>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot" id="sync-dot"></span>
@@ -254,6 +256,46 @@
       </div>
     </section>
 
+    <!-- PRODUCTOS -->
+    <section id="view-productos" class="view">
+      <header class="view-header">
+        <h1>Productos</h1>
+        <p>Catálogo de materiales que el operador puede elegir en "Modo operador", organizado por categoría.</p>
+      </header>
+      <div class="panel">
+        <form id="form-producto" class="form-grid">
+          <input type="hidden" id="prod-id" value="">
+          <div class="field">
+            <label>Categoría</label>
+            <input type="text" id="prod-categoria" list="prod-categorias-list" placeholder="Ej: Metales" required>
+            <datalist id="prod-categorias-list"></datalist>
+          </div>
+          <div class="field">
+            <label>Nombre del producto</label>
+            <input type="text" id="prod-nombre" placeholder="Ej: Chatarra ferrosa" required>
+          </div>
+          <div class="field">
+            <label>Ícono <span class="hint">(un emoji, ej: 🔩)</span></label>
+            <input type="text" id="prod-icono" placeholder="📦" maxlength="8">
+          </div>
+          <div class="field">
+            <label>Unidad</label>
+            <select id="prod-unidad">
+              <option value="kg">kg</option>
+              <option value="lb">lb</option>
+              <option value="gal">gal</option>
+              <option value="unidad">unidad</option>
+            </select>
+          </div>
+          <div class="field form-actions">
+            <button type="button" class="btn btn-ghost" id="btn-prod-cancelar" style="display:none;">Cancelar edición</button>
+            <button type="submit" class="btn btn-primary" id="btn-prod-guardar">+ Agregar producto</button>
+          </div>
+        </form>
+      </div>
+      <div class="panel" id="productos-panel"></div>
+    </section>
+
     <!-- CERTIFICADOS -->
     <section id="view-certificados" class="view">
       <header class="view-header">
@@ -325,6 +367,101 @@
     </section>
 
   </main>
+</div>
+
+<!-- MODO OPERADOR: pantalla completa, visual, para recolección en sitio -->
+<div id="operador-shell">
+  <header class="op-header">
+    <div class="op-brand">
+      <div class="op-brand-mark" id="op-brand-mark">R</div>
+      <div class="op-brand-title" id="op-brand-title">Remisiones</div>
+    </div>
+    <button class="op-admin-link" id="btn-modo-admin">⚙ Modo administrador</button>
+  </header>
+
+  <!-- Paso 1: cliente -->
+  <section class="op-step active" id="op-step-cliente">
+    <h1 class="op-step-title">¿Para quién es la recolección?</h1>
+    <div class="op-clientes-grid" id="op-clientes-grid"></div>
+  </section>
+
+  <!-- Paso 2: materiales -->
+  <section class="op-step" id="op-step-materiales">
+    <div class="op-step-head">
+      <button class="op-back" id="btn-op-volver-cliente">‹ Volver</button>
+      <h1 class="op-step-title" id="op-materiales-cliente-nombre">¿Qué recogiste?</h1>
+    </div>
+    <div class="op-categorias-row" id="op-categorias-row"></div>
+    <div class="op-productos-grid" id="op-productos-grid"></div>
+  </section>
+
+  <!-- Paso 3: confirmar -->
+  <section class="op-step" id="op-step-confirmar">
+    <div class="op-step-head">
+      <button class="op-back" id="btn-op-volver-materiales">‹ Volver</button>
+      <h1 class="op-step-title">Confirma la recolección</h1>
+    </div>
+    <div class="op-resumen" id="op-resumen"></div>
+    <div class="op-extra-fields">
+      <div class="field">
+        <label>Placa del vehículo <span class="hint">(opcional)</span></label>
+        <input type="text" id="op-placa" placeholder="ABC123">
+      </div>
+      <div class="field">
+        <label>Notas <span class="hint">(opcional)</span></label>
+        <textarea id="op-observaciones" rows="2"></textarea>
+      </div>
+    </div>
+    <button class="btn-op-primary btn-op-full" id="btn-op-guardar">✅ Guardar recolección</button>
+  </section>
+
+  <!-- Paso 4: éxito -->
+  <section class="op-step" id="op-step-exito">
+    <div class="op-exito">
+      <div class="op-exito-check">✔</div>
+      <div class="op-exito-title" id="op-exito-title">¡Recolección guardada!</div>
+      <div class="op-exito-sub" id="op-exito-sub"></div>
+      <div class="op-exito-actions">
+        <button class="btn-op-secondary" id="btn-op-imprimir">🖨️ Imprimir</button>
+        <button class="btn-op-primary" id="btn-op-nueva">➕ Nueva recolección</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Barra inferior con el resumen del "ticket" (paso de materiales) -->
+  <div class="op-ticket-bar" id="op-ticket-bar">
+    <button class="op-ticket-info" id="btn-op-ver-ticket">
+      <span id="op-ticket-info-text">0 materiales agregados</span>
+      <span class="op-ticket-arrow">▲</span>
+    </button>
+    <button class="btn-op-primary op-ticket-continuar" id="btn-op-continuar" disabled>Continuar ▶</button>
+  </div>
+
+  <!-- Panel deslizable con la lista de materiales agregados -->
+  <div class="op-ticket-panel" id="op-ticket-panel">
+    <div class="op-ticket-panel-head">
+      <span>Materiales agregados</span>
+      <button class="op-ticket-cerrar" id="btn-op-cerrar-ticket">✕</button>
+    </div>
+    <div id="op-ticket-lista"></div>
+  </div>
+
+  <!-- Modal de cantidad al tocar un producto -->
+  <div class="op-modal-overlay" id="op-modal-cantidad">
+    <div class="op-modal">
+      <div class="op-modal-producto" id="op-modal-producto"></div>
+      <div class="op-modal-stepper">
+        <button class="op-stepper-btn" id="btn-op-menos" type="button">−</button>
+        <input type="number" id="op-cantidad-input" inputmode="decimal" min="0" step="0.5" value="1">
+        <button class="op-stepper-btn" id="btn-op-mas" type="button">+</button>
+      </div>
+      <div class="op-modal-unidad" id="op-modal-unidad"></div>
+      <div class="op-modal-actions">
+        <button class="btn-op-secondary" id="btn-op-cancelar-cantidad" type="button">Cancelar</button>
+        <button class="btn-op-primary" id="btn-op-agregar-cantidad" type="button">✓ Agregar</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- PRINT AREAS (hidden on screen, shown only on print) -->

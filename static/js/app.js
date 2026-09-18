@@ -49,6 +49,7 @@ function refreshView(name) {
   if (name === "nueva-remision") renderNuevaRemisionForm();
   if (name === "remisiones") renderRemisiones();
   if (name === "generadores") renderGeneradores();
+  if (name === "productos") renderProductos();
   if (name === "certificados") renderCertificados();
   if (name === "empresa") renderEmpresaForm();
 }
@@ -214,6 +215,110 @@ async function removeGenerador(id) {
     await apiDelete(`/generadores/${id}`);
     await refreshGeneradores();
     renderGeneradores();
+  } catch (err) { showError(err); }
+}
+
+// ---------- Productos (catálogo para el modo operador) ----------
+let editingProductoId = null;
+
+function fillCategoriasDatalist() {
+  const categorias = [...new Set(CACHE.productos.map(p => p.categoria))].sort();
+  document.getElementById("prod-categorias-list").innerHTML = categorias.map(c => `<option value="${c}">`).join("");
+}
+
+function renderProductos() {
+  fillCategoriasDatalist();
+  const panel = document.getElementById("productos-panel");
+  if (CACHE.productos.length === 0) {
+    panel.innerHTML = `<div class="empty-state">No hay productos en el catálogo. Agrega el primero arriba.</div>`;
+    return;
+  }
+  const porCategoria = {};
+  CACHE.productos.forEach(p => {
+    (porCategoria[p.categoria] || (porCategoria[p.categoria] = [])).push(p);
+  });
+  panel.innerHTML = Object.keys(porCategoria).sort().map(cat => `
+    <div class="prod-categoria-group">
+      <h3 class="prod-categoria-titulo">${cat}</h3>
+      ${porCategoria[cat].map(p => `
+        <div class="prod-row ${p.activo ? "" : "inactivo"}">
+          <span class="icon">${p.icono || "📦"}</span>
+          <span class="nombre">${p.nombre}</span>
+          <span class="unidad">${p.unidad}</span>
+          <div class="row-actions">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="editProducto(${p.id})">Editar</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleProductoActivo(${p.id})">${p.activo ? "Desactivar" : "Activar"}</button>
+            <button type="button" class="btn btn-danger btn-sm" onclick="removeProducto(${p.id})">Eliminar</button>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `).join("");
+}
+
+function editProducto(id) {
+  const p = CACHE.productos.find(x => x.id === id);
+  if (!p) return;
+  editingProductoId = id;
+  document.getElementById("prod-id").value = id;
+  document.getElementById("prod-categoria").value = p.categoria;
+  document.getElementById("prod-nombre").value = p.nombre;
+  document.getElementById("prod-icono").value = p.icono;
+  document.getElementById("prod-unidad").value = p.unidad;
+  document.getElementById("btn-prod-guardar").textContent = "Guardar cambios";
+  document.getElementById("btn-prod-cancelar").style.display = "inline-block";
+  document.getElementById("prod-categoria").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function cancelEditProducto() {
+  editingProductoId = null;
+  document.getElementById("form-producto").reset();
+  document.getElementById("prod-id").value = "";
+  document.getElementById("btn-prod-guardar").textContent = "+ Agregar producto";
+  document.getElementById("btn-prod-cancelar").style.display = "none";
+}
+document.getElementById("btn-prod-cancelar").addEventListener("click", cancelEditProducto);
+
+document.getElementById("form-producto").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const existing = editingProductoId ? CACHE.productos.find(x => x.id === editingProductoId) : null;
+  const payload = {
+    categoria: document.getElementById("prod-categoria").value.trim(),
+    nombre: document.getElementById("prod-nombre").value.trim(),
+    icono: document.getElementById("prod-icono").value.trim() || "📦",
+    unidad: document.getElementById("prod-unidad").value,
+    valor_unitario: existing ? existing.valor_unitario : 0,
+    orden: existing ? existing.orden : 0,
+    activo: existing ? existing.activo : true,
+  };
+  try {
+    if (editingProductoId) {
+      await apiPut(`/productos/${editingProductoId}`, payload);
+    } else {
+      await apiPost("/productos/", payload);
+    }
+    cancelEditProducto();
+    await refreshProductos();
+    renderProductos();
+  } catch (err) { showError(err); }
+});
+
+async function toggleProductoActivo(id) {
+  const p = CACHE.productos.find(x => x.id === id);
+  if (!p) return;
+  try {
+    await apiPut(`/productos/${id}`, { ...p, activo: !p.activo });
+    await refreshProductos();
+    renderProductos();
+  } catch (err) { showError(err); }
+}
+
+async function removeProducto(id) {
+  if (!confirm("¿Eliminar este producto del catálogo?")) return;
+  try {
+    await apiDelete(`/productos/${id}`);
+    await refreshProductos();
+    renderProductos();
   } catch (err) { showError(err); }
 }
 
@@ -729,6 +834,300 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+// ---------- Modo operador / administrador ----------
+// Modo operador: pantalla completa, grande y visual (poco texto, mucho ícono)
+// pensada para quien recolecta en sitio y puede tener poca costumbre de
+// lectura. El administrador sigue registrando clientes y el catálogo de
+// productos desde el modo normal; el operador solo elige y confirma.
+function setModo(modo) {
+  localStorage.setItem("xtend6_modo", modo);
+  if (modo === "operador") {
+    document.body.classList.add("modo-operador");
+    initOperador();
+  } else {
+    document.body.classList.remove("modo-operador");
+    document.body.classList.remove("op-en-materiales");
+  }
+}
+document.getElementById("btn-modo-operador").addEventListener("click", () => setModo("operador"));
+document.getElementById("btn-modo-admin").addEventListener("click", () => setModo("admin"));
+
+const opState = { clienteId: null, categoriaActiva: null, items: [] };
+
+function opBrand() {
+  const e = CACHE.empresa || {};
+  document.getElementById("op-brand-title").textContent = e.nombre || "Remisiones";
+  document.getElementById("op-brand-mark").innerHTML = e.logo ? `<img src="${e.logo}" alt="Logo">` : "R";
+}
+
+function opSetStep(name) {
+  document.querySelectorAll(".op-step").forEach(s => s.classList.remove("active"));
+  document.getElementById("op-step-" + name).classList.add("active");
+  document.body.classList.toggle("op-en-materiales", name === "materiales");
+  closeTicketPanel();
+}
+
+function initOperador() {
+  opBrand();
+  opState.clienteId = null;
+  opState.categoriaActiva = null;
+  opState.items = [];
+  renderOpClientes();
+  opSetStep("cliente");
+}
+
+// ---- Paso 1: elegir cliente ----
+function renderOpClientes() {
+  const grid = document.getElementById("op-clientes-grid");
+  const generadores = [...CACHE.generadores].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  if (generadores.length === 0) {
+    grid.innerHTML = `<div class="empty-state">No hay clientes registrados todavía. Pide a un administrador que registre uno en "Generadores".</div>`;
+    return;
+  }
+  grid.innerHTML = generadores.map(g => `
+    <button type="button" class="op-cliente-card" onclick="opSeleccionarCliente(${g.id})">
+      <div class="op-cliente-avatar">${(g.nombre || "?").charAt(0).toUpperCase()}</div>
+      <div>
+        <div class="op-cliente-nombre">${g.nombre}</div>
+        <div class="op-cliente-sub">${[g.sucursal, g.ciudad].filter(Boolean).join(" · ") || "&nbsp;"}</div>
+      </div>
+    </button>
+  `).join("");
+}
+
+function opSeleccionarCliente(id) {
+  opState.clienteId = id;
+  opState.categoriaActiva = null;
+  opState.items = [];
+  const g = generadorById(id);
+  document.getElementById("op-materiales-cliente-nombre").textContent = g ? g.nombre : "¿Qué recogiste?";
+  renderOpCategorias();
+  renderOpTicket();
+  opSetStep("materiales");
+}
+document.getElementById("btn-op-volver-cliente").addEventListener("click", () => opSetStep("cliente"));
+
+// ---- Paso 2: categorías + productos ----
+function opProductosActivos() {
+  return CACHE.productos.filter(p => p.activo);
+}
+
+function renderOpCategorias() {
+  const productos = opProductosActivos();
+  const categorias = [...new Set(productos.map(p => p.categoria))];
+  if (!opState.categoriaActiva || !categorias.includes(opState.categoriaActiva)) {
+    opState.categoriaActiva = categorias[0] || null;
+  }
+  const row = document.getElementById("op-categorias-row");
+  if (categorias.length === 0) {
+    row.innerHTML = "";
+    document.getElementById("op-productos-grid").innerHTML = `<div class="empty-state">No hay productos activos en el catálogo. Pide a un administrador que agregue alguno en "Productos".</div>`;
+    return;
+  }
+  row.innerHTML = categorias.map(cat => {
+    const first = productos.find(p => p.categoria === cat);
+    const catEsc = cat.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+    return `<button type="button" class="op-categoria-pill ${cat === opState.categoriaActiva ? "active" : ""}" onclick="opSeleccionarCategoria('${catEsc}')">
+      <span class="icon">${first ? first.icono : "📦"}</span>${cat}
+    </button>`;
+  }).join("");
+  renderOpProductos();
+}
+
+function opSeleccionarCategoria(cat) {
+  opState.categoriaActiva = cat;
+  renderOpCategorias();
+}
+
+function opCantidadEnTicket(productoId) {
+  const item = opState.items.find(i => i.producto_id === productoId);
+  return item ? item.cantidad : 0;
+}
+
+function renderOpProductos() {
+  const productos = opProductosActivos().filter(p => p.categoria === opState.categoriaActiva);
+  const grid = document.getElementById("op-productos-grid");
+  if (productos.length === 0) {
+    grid.innerHTML = `<div class="empty-state">No hay productos en esta categoría.</div>`;
+    return;
+  }
+  grid.innerHTML = productos.map(p => {
+    const cant = opCantidadEnTicket(p.id);
+    return `<button type="button" class="op-producto-card" onclick="opAbrirCantidad(${p.id})">
+      ${cant > 0 ? `<span class="badge-cant">${fmtKg(cant)}</span>` : ""}
+      <span class="icon">${p.icono || "📦"}</span>
+      <span class="nombre">${p.nombre}</span>
+    </button>`;
+  }).join("");
+}
+
+// ---- Modal de cantidad ----
+let opModalProductoId = null;
+
+function opAbrirCantidad(productoId) {
+  const p = CACHE.productos.find(x => x.id === productoId);
+  if (!p) return;
+  opModalProductoId = productoId;
+  document.getElementById("op-modal-producto").innerHTML = `<span class="icon">${p.icono || "📦"}</span> ${p.nombre}`;
+  document.getElementById("op-modal-unidad").textContent = `Unidad: ${p.unidad}`;
+  const actual = opCantidadEnTicket(productoId);
+  document.getElementById("op-cantidad-input").value = actual > 0 ? actual : 1;
+  document.getElementById("op-modal-cantidad").classList.add("open");
+}
+
+function opCerrarModalCantidad() {
+  document.getElementById("op-modal-cantidad").classList.remove("open");
+  opModalProductoId = null;
+}
+document.getElementById("btn-op-cancelar-cantidad").addEventListener("click", opCerrarModalCantidad);
+
+document.getElementById("btn-op-menos").addEventListener("click", () => {
+  const input = document.getElementById("op-cantidad-input");
+  input.value = Math.max(0, (parseFloat(input.value) || 0) - 1);
+});
+document.getElementById("btn-op-mas").addEventListener("click", () => {
+  const input = document.getElementById("op-cantidad-input");
+  input.value = (parseFloat(input.value) || 0) + 1;
+});
+
+document.getElementById("btn-op-agregar-cantidad").addEventListener("click", () => {
+  const cantidad = parseFloat(document.getElementById("op-cantidad-input").value) || 0;
+  const p = CACHE.productos.find(x => x.id === opModalProductoId);
+  if (!p) return;
+  const existing = opState.items.find(i => i.producto_id === p.id);
+  if (cantidad <= 0) {
+    if (existing) opState.items = opState.items.filter(i => i.producto_id !== p.id);
+  } else if (existing) {
+    existing.cantidad = cantidad;
+  } else {
+    opState.items.push({ producto_id: p.id, nombre: p.nombre, icono: p.icono, unidad: p.unidad, valor_unitario: p.valor_unitario, cantidad });
+  }
+  opCerrarModalCantidad();
+  renderOpProductos();
+  renderOpTicket();
+});
+
+// ---- Ticket (lista de materiales agregados) ----
+function renderOpTicket() {
+  const count = opState.items.length;
+  document.getElementById("op-ticket-info-text").textContent = count === 0
+    ? "Toca un producto para agregarlo"
+    : `${count} material(es) agregado(s)`;
+  document.getElementById("btn-op-continuar").disabled = count === 0;
+
+  const lista = document.getElementById("op-ticket-lista");
+  if (count === 0) {
+    lista.innerHTML = `<div class="op-ticket-empty">Aún no has agregado materiales.</div>`;
+    return;
+  }
+  lista.innerHTML = opState.items.map(i => `
+    <div class="op-ticket-item">
+      <span class="icon">${i.icono || "📦"}</span>
+      <div class="info">
+        <div class="nombre">${i.nombre}</div>
+        <div class="cant">${fmtKg(i.cantidad)} ${i.unidad}</div>
+      </div>
+      <button type="button" onclick="opQuitarItem(${i.producto_id})">✕</button>
+    </div>
+  `).join("");
+}
+
+function opQuitarItem(productoId) {
+  opState.items = opState.items.filter(i => i.producto_id !== productoId);
+  renderOpProductos();
+  renderOpTicket();
+}
+
+function closeTicketPanel() {
+  document.getElementById("op-ticket-panel").classList.remove("open");
+}
+document.getElementById("btn-op-ver-ticket").addEventListener("click", () => {
+  document.getElementById("op-ticket-panel").classList.toggle("open");
+});
+document.getElementById("btn-op-cerrar-ticket").addEventListener("click", closeTicketPanel);
+
+document.getElementById("btn-op-continuar").addEventListener("click", () => {
+  if (opState.items.length === 0) return;
+  closeTicketPanel();
+  renderOpConfirmar();
+  opSetStep("confirmar");
+});
+document.getElementById("btn-op-volver-materiales").addEventListener("click", () => opSetStep("materiales"));
+
+// ---- Paso 3: confirmar ----
+function renderOpConfirmar() {
+  const g = generadorById(opState.clienteId);
+  document.getElementById("op-resumen").innerHTML = `
+    <div class="op-resumen-cliente">${g ? g.nombre : "—"}</div>
+    ${opState.items.map(i => `
+      <div class="op-resumen-item">
+        <span class="icon">${i.icono || "📦"}</span>
+        <span class="nombre">${i.nombre}</span>
+        <span class="cant">${fmtKg(i.cantidad)} ${i.unidad}</span>
+      </div>
+    `).join("")}
+  `;
+  document.getElementById("op-placa").value = "";
+  document.getElementById("op-observaciones").value = "";
+}
+
+document.getElementById("btn-op-guardar").addEventListener("click", async () => {
+  const payload = {
+    fecha: new Date().toISOString().slice(0, 10),
+    generador_id: opState.clienteId,
+    placa: document.getElementById("op-placa").value.trim(),
+    observaciones: document.getElementById("op-observaciones").value.trim(),
+    materiales: opState.items.map(i => ({
+      nombre: i.nombre,
+      estado: "Sólido",
+      disposicion: "",
+      unidad: i.unidad,
+      cantidad: i.cantidad,
+      valor_unitario: i.valor_unitario || 0,
+    })),
+  };
+  const btn = document.getElementById("btn-op-guardar");
+  btn.disabled = true;
+  try {
+    const remision = await apiPost("/remisiones/", payload);
+    await refreshRemisiones();
+    renderOpExito(remision, false);
+    opSetStep("exito");
+  } catch (err) {
+    if (err instanceof NetworkError) {
+      const item = { local_id: newLocalId(), payload, created_at: new Date().toISOString() };
+      await Queue.add(item);
+      await refreshPending();
+      updateSyncStatus();
+      renderOpExito(pendingAsRemision(item), true);
+      opSetStep("exito");
+    } else {
+      showError(err);
+    }
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ---- Paso 4: éxito ----
+let opUltimaRemisionId = null;
+function renderOpExito(remision, offline) {
+  opUltimaRemisionId = remision.id;
+  document.getElementById("op-exito-title").textContent = offline ? "Guardada en este dispositivo" : "¡Recolección guardada!";
+  document.getElementById("op-exito-sub").textContent = offline
+    ? "Sin conexión: se enviará sola cuando vuelva el internet."
+    : `Remisión N.° ${remision.consecutivo}`;
+}
+document.getElementById("btn-op-imprimir").addEventListener("click", () => {
+  if (opUltimaRemisionId != null) printRemision(opUltimaRemisionId);
+});
+document.getElementById("btn-op-nueva").addEventListener("click", () => {
+  opState.clienteId = null;
+  opState.items = [];
+  renderOpClientes();
+  opSetStep("cliente");
+});
+
 // ---------- Init ----------
 (async function init() {
   try {
@@ -738,6 +1137,7 @@ if ("serviceWorker" in navigator) {
     updateSyncStatus();
     updateInstallButton();
     trySync();
+    if (localStorage.getItem("xtend6_modo") === "operador") setModo("operador");
   } catch (err) {
     console.error(err);
     document.querySelector(".content").innerHTML = `<div class="panel"><p>No se pudo conectar con el servidor. ¿Está corriendo la API?</p><p style="color:#888;font-size:12px;">${err.message}</p></div>`;

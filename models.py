@@ -41,6 +41,24 @@ class GeneradorOut(GeneradorCreate):
         from_attributes = True
 
 
+# ---------- Productos (catálogo para el modo operador) ----------
+class ProductoIn(BaseModel):
+    categoria: str
+    nombre: str
+    icono: str = "📦"
+    unidad: str = "kg"
+    valor_unitario: float = 0
+    orden: int = 0
+    activo: bool = True
+
+
+class ProductoOut(ProductoIn):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
 # ---------- Materiales (anidados en Remisión) ----------
 class MaterialIn(BaseModel):
     nombre: str
