@@ -10,6 +10,7 @@ const SHELL_FILES = [
   "/css/styles.css",
   "/js/idb.js",
   "/js/api.js",
+  "/js/manifiesto-template.js",
   "/js/app.js",
   "/icons/icon-192.png",
   "/icons/icon-512.png",

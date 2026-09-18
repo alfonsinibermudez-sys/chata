@@ -1,15 +1,19 @@
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Optional
 
 import psycopg2.extras
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from database import execute, get_conn, release_conn
+from emailer import send_email, smtp_configured
 from models import RemisionCreate, RemisionOut
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
 def _attach_materiales(remisiones: list[dict]) -> list[dict]:
@@ -125,6 +129,37 @@ def marcar_enviada(remision_id: int):
         raise HTTPException(status_code=404, detail="Remisión no encontrada")
     logger.info(f"[Remisiones] Marcada enviada: {remision_id}")
     return _attach_materiales([row])[0]
+
+
+@router.post("/{remision_id}/enviar-email")
+def enviar_email_remision(remision_id: int, request: Request):
+    remision = execute("SELECT * FROM remisiones WHERE id = %s", (remision_id,), fetchone=True)
+    if not remision:
+        raise HTTPException(status_code=404, detail="Remisión no encontrada")
+    generador = execute("SELECT * FROM generadores WHERE id = %s", (remision["generador_id"],), fetchone=True)
+    email = (generador or {}).get("email", "")
+    if not email or not EMAIL_RE.match(email):
+        raise HTTPException(status_code=422, detail="El generador no tiene un email válido registrado")
+    if not smtp_configured():
+        raise HTTPException(status_code=503, detail="El envío de correos no está configurado todavía (faltan credenciales SMTP)")
+
+    empresa = execute("SELECT * FROM empresa ORDER BY id LIMIT 1", fetchone=True) or {}
+    empresa_nombre = empresa.get("nombre") or "Chatarrería"
+    link = f"{str(request.base_url).rstrip('/')}/manifiesto.html?id={remision_id}"
+    subject = f"Manifiesto de carga N.° {remision['consecutivo']} — {empresa_nombre}"
+    text_body = f"Manifiesto de carga N.° {remision['consecutivo']} de {empresa_nombre}.\nVerlo / imprimirlo: {link}"
+    html_body = (
+        f"<p>Hola,</p>"
+        f"<p>Te compartimos el manifiesto de carga N.° {remision['consecutivo']} de <strong>{empresa_nombre}</strong>.</p>"
+        f'<p><a href="{link}">Ver / imprimir el manifiesto</a></p>'
+    )
+    try:
+        send_email(email, subject, text_body, html_body)
+    except Exception as e:
+        logger.error(f"[Remisiones] Error enviando email de {remision_id}: {e}")
+        raise HTTPException(status_code=502, detail="No se pudo enviar el correo. Revisa las credenciales SMTP.")
+    logger.info(f"[Remisiones] Email enviado: remision={remision_id} a={email}")
+    return {"ok": True, "email": email}
 
 
 @router.delete("/{remision_id}")
