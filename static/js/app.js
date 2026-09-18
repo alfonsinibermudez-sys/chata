@@ -907,7 +907,7 @@ document.getElementById("btn-modo-admin").addEventListener("click", () => setMod
 
 const opState = {
   operadorId: null, operadorNombre: "", operadorCedula: "", operadorVehiculo: "", operadorPlaca: "", operadorFirma: "",
-  clienteId: null, categoriaActiva: null, items: [],
+  clienteId: null, categoriaActiva: null, items: [], horaLlegada: "",
 };
 
 function opBrand() {
@@ -948,6 +948,7 @@ function initOperador() {
   opState.clienteId = null;
   opState.categoriaActiva = null;
   opState.items = [];
+  opState.horaLlegada = "";
   opUpdateOperadorChip();
   renderOpOperadores();
   opSetStep("operador", true);
@@ -1021,10 +1022,16 @@ function renderOpClientes() {
   `).join("");
 }
 
+function nowHHMM() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 function opSeleccionarCliente(id) {
   opState.clienteId = id;
   opState.categoriaActiva = null;
   opState.items = [];
+  opState.horaLlegada = nowHHMM();
   const g = generadorById(id);
   document.getElementById("op-materiales-cliente-nombre").textContent = g ? g.nombre : "¿Qué recogiste?";
   renderOpCategorias();
@@ -1265,6 +1272,8 @@ document.getElementById("btn-op-guardar").addEventListener("click", async () => 
     conductor_cedula: opState.operadorCedula,
     vehiculo: opState.operadorVehiculo,
     placa: document.getElementById("op-placa").value.trim(),
+    hora_llegada: opState.horaLlegada,
+    hora_salida: nowHHMM(),
     observaciones: document.getElementById("op-observaciones").value.trim(),
     firma_cliente: opFirmaHasContent ? opFirmaCanvas.toDataURL("image/png") : "",
     firma_responsable: opState.operadorFirma,
