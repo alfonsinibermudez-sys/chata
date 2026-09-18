@@ -717,8 +717,10 @@ function printRemision(id) {
           <h4>${emp.nombre || "Transporte"}</h4>
           <div class="row"><span class="k">Vehículo</span><span class="v">${r.vehiculo || "—"}</span></div>
           <div class="row"><span class="k">Placa</span><span class="v">${r.placa || "—"}</span></div>
-          <div class="row"><span class="k">Conductor</span><span class="v">${[r.conductor_nombre, r.conductor_cedula].filter(Boolean).join(" / ") || "—"}</span></div>
-          <div class="row"><span class="k">Auxiliar</span><span class="v">${[r.auxiliar_nombre, r.auxiliar_cedula].filter(Boolean).join(" / ") || "—"}</span></div>
+          <div class="row"><span class="k">Conductor</span><span class="v">${r.conductor_nombre || "—"}</span></div>
+          <div class="row"><span class="k">Cédula conductor</span><span class="v">${r.conductor_cedula || "—"}</span></div>
+          <div class="row"><span class="k">Auxiliar</span><span class="v">${r.auxiliar_nombre || "—"}</span></div>
+          <div class="row"><span class="k">Cédula auxiliar</span><span class="v">${r.auxiliar_cedula || "—"}</span></div>
           <div class="row"><span class="k">Responsable</span><span class="v">${r.responsable || "—"}</span></div>
           <div class="row"><span class="k">Destino</span><span class="v">${r.destino || "—"}</span></div>
         </div>
@@ -729,6 +731,10 @@ function printRemision(id) {
         <thead><tr><th>Nombre</th><th>Estado</th><th>Disposición</th><th class="num">Unid</th><th class="num">Cant</th></tr></thead>
         <tbody>${materialRows}${blankRowsHtml}</tbody>
       </table>
+      <div class="doc-totales">
+        <span>Total kg: <strong>${fmtKg(totalKgRemision(r))}</strong></span>
+        <span>Total valor: <strong>${fmtCOP(totalValorRemision(r))}</strong></span>
+      </div>
       <div class="doc-note">Nota: pesos/cantidades sujetos a calibración de báscula.</div>
 
       <div class="doc-obs">

@@ -290,6 +290,9 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--moss-soft);
 .doc-table tbody tr:nth-child(even) { background: #fafbf9; }
 .doc-table tbody td.blank { color: transparent; }
 
+.doc-totales { display: flex; justify-content: flex-end; gap: 24px; font-size: 12px; margin: 8px 0 4px; color: #333; }
+.doc-totales strong { font-family: var(--font-mono); }
+
 .doc-note { font-size: 9.5px; color: #888; margin: 6px 0 14px; }
 
 .doc-obs { margin: 4px 0 16px; }
