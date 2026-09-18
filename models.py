@@ -59,6 +59,19 @@ class ProductoOut(ProductoIn):
         from_attributes = True
 
 
+# ---------- Operadores (quién recolecta, para "Modo operador") ----------
+class OperadorIn(BaseModel):
+    nombre: str
+    activo: bool = True
+
+
+class OperadorOut(OperadorIn):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
 # ---------- Materiales (anidados en Remisión) ----------
 class MaterialIn(BaseModel):
     nombre: str
@@ -93,6 +106,7 @@ class RemisionCreate(BaseModel):
     hora_salida: str = ""
     observaciones: str = ""
     responsable_cliente: str = ""
+    firma_cliente: str = ""
     materiales: list[MaterialIn] = Field(default_factory=list)
 
 
@@ -113,6 +127,7 @@ class RemisionOut(BaseModel):
     hora_salida: str
     observaciones: str
     responsable_cliente: str
+    firma_cliente: str = ""
     estado: str
     created_at: datetime
     enviada_at: Optional[datetime] = None

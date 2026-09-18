@@ -107,6 +107,20 @@ CREATE TABLE IF NOT EXISTS productos (
 );
 CREATE INDEX IF NOT EXISTS idx_productos_categoria ON productos(categoria);
 
+-- Operadores de recolección (quién usa "Modo operador"), para que la
+-- remisión quede con el nombre de quien recolectó sin que tenga que escribirlo.
+CREATE TABLE IF NOT EXISTS operadores (
+    id SERIAL PRIMARY KEY,
+    nombre TEXT NOT NULL,
+    activo BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Firma táctil de quien recibe la recolección, capturada en "Modo operador"
+-- (imagen PNG en base64). `remisiones` ya existe en producción, así que el
+-- CREATE TABLE de arriba no la toca: hace falta este ALTER explícito.
+ALTER TABLE remisiones ADD COLUMN IF NOT EXISTS firma_cliente TEXT NOT NULL DEFAULT '';
+
 -- Catálogo inicial (solo la primera vez que la tabla está vacía) para que el
 -- modo operador tenga algo que mostrar desde el primer arranque; el
 -- administrador lo edita luego desde "Productos".

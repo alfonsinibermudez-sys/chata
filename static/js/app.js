@@ -50,6 +50,7 @@ function refreshView(name) {
   if (name === "remisiones") renderRemisiones();
   if (name === "generadores") renderGeneradores();
   if (name === "productos") renderProductos();
+  if (name === "operadores") renderOperadores();
   if (name === "certificados") renderCertificados();
   if (name === "empresa") renderEmpresaForm();
 }
@@ -319,6 +320,85 @@ async function removeProducto(id) {
     await apiDelete(`/productos/${id}`);
     await refreshProductos();
     renderProductos();
+  } catch (err) { showError(err); }
+}
+
+// ---------- Operadores (quién recolecta) ----------
+let editingOperadorId = null;
+
+function renderOperadores() {
+  const panel = document.getElementById("operadores-panel");
+  if (CACHE.operadores.length === 0) {
+    panel.innerHTML = `<div class="empty-state">No hay operadores registrados. Agrega el primero arriba.</div>`;
+    return;
+  }
+  const list = [...CACHE.operadores].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  panel.innerHTML = list.map(o => `
+    <div class="prod-row ${o.activo ? "" : "inactivo"}">
+      <span class="nombre">${o.nombre}</span>
+      <div class="row-actions">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="editOperador(${o.id})">Editar</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleOperadorActivo(${o.id})">${o.activo ? "Desactivar" : "Activar"}</button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="removeOperador(${o.id})">Eliminar</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function editOperador(id) {
+  const o = CACHE.operadores.find(x => x.id === id);
+  if (!o) return;
+  editingOperadorId = id;
+  document.getElementById("oper-id").value = id;
+  document.getElementById("oper-nombre").value = o.nombre;
+  document.getElementById("btn-oper-guardar").textContent = "Guardar cambios";
+  document.getElementById("btn-oper-cancelar").style.display = "inline-block";
+}
+
+function cancelEditOperador() {
+  editingOperadorId = null;
+  document.getElementById("form-operador").reset();
+  document.getElementById("oper-id").value = "";
+  document.getElementById("btn-oper-guardar").textContent = "+ Agregar operador";
+  document.getElementById("btn-oper-cancelar").style.display = "none";
+}
+document.getElementById("btn-oper-cancelar").addEventListener("click", cancelEditOperador);
+
+document.getElementById("form-operador").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const existing = editingOperadorId ? CACHE.operadores.find(x => x.id === editingOperadorId) : null;
+  const payload = {
+    nombre: document.getElementById("oper-nombre").value.trim(),
+    activo: existing ? existing.activo : true,
+  };
+  try {
+    if (editingOperadorId) {
+      await apiPut(`/operadores/${editingOperadorId}`, payload);
+    } else {
+      await apiPost("/operadores/", payload);
+    }
+    cancelEditOperador();
+    await refreshOperadores();
+    renderOperadores();
+  } catch (err) { showError(err); }
+});
+
+async function toggleOperadorActivo(id) {
+  const o = CACHE.operadores.find(x => x.id === id);
+  if (!o) return;
+  try {
+    await apiPut(`/operadores/${id}`, { ...o, activo: !o.activo });
+    await refreshOperadores();
+    renderOperadores();
+  } catch (err) { showError(err); }
+}
+
+async function removeOperador(id) {
+  if (!confirm("¿Eliminar este operador?")) return;
+  try {
+    await apiDelete(`/operadores/${id}`);
+    await refreshOperadores();
+    renderOperadores();
   } catch (err) { showError(err); }
 }
 
@@ -606,7 +686,7 @@ function printRemision(id) {
         </div>
         <div class="doc-signature">
           <div class="role">Responsable cliente</div>
-          ${r.responsable_cliente || ""}
+          ${r.firma_cliente ? `<img src="${r.firma_cliente}" style="max-width:180px;max-height:60px;display:block;margin:0 auto 4px;">` : ""}${r.responsable_cliente || ""}
         </div>
       </div>
 
@@ -852,7 +932,7 @@ function setModo(modo) {
 document.getElementById("btn-modo-operador").addEventListener("click", () => setModo("operador"));
 document.getElementById("btn-modo-admin").addEventListener("click", () => setModo("admin"));
 
-const opState = { clienteId: null, categoriaActiva: null, items: [] };
+const opState = { operadorId: null, operadorNombre: "", clienteId: null, categoriaActiva: null, items: [] };
 
 function opBrand() {
   const e = CACHE.empresa || {};
@@ -860,21 +940,83 @@ function opBrand() {
   document.getElementById("op-brand-mark").innerHTML = e.logo ? `<img src="${e.logo}" alt="Logo">` : "R";
 }
 
-function opSetStep(name) {
+function opUpdateOperadorChip() {
+  const chip = document.getElementById("op-operador-chip");
+  if (opState.operadorId) {
+    chip.style.display = "inline-block";
+    chip.textContent = `👤 ${opState.operadorNombre} · cambiar`;
+  } else {
+    chip.style.display = "none";
+  }
+}
+
+// Cada paso hacia adelante deja una entrada en el historial del navegador,
+// para que el botón "atrás" físico del celular retroceda un paso del
+// asistente en vez de cerrar la app (ver el listener de popstate más abajo).
+function opSetStep(name, pushHistory) {
   document.querySelectorAll(".op-step").forEach(s => s.classList.remove("active"));
   document.getElementById("op-step-" + name).classList.add("active");
   document.body.classList.toggle("op-en-materiales", name === "materiales");
   closeTicketPanel();
+  if (pushHistory) history.pushState({ opStep: name }, "");
 }
 
 function initOperador() {
   opBrand();
+  opState.operadorId = null;
+  opState.operadorNombre = "";
   opState.clienteId = null;
   opState.categoriaActiva = null;
   opState.items = [];
-  renderOpClientes();
-  opSetStep("cliente");
+  opUpdateOperadorChip();
+  renderOpOperadores();
+  opSetStep("operador", true);
 }
+
+window.addEventListener("popstate", () => {
+  if (!document.body.classList.contains("modo-operador")) return;
+  const activo = document.querySelector(".op-step.active");
+  const step = activo ? activo.id.replace("op-step-", "") : "operador";
+  if (step === "cliente") { opSetStep("operador", true); }
+  else if (step === "materiales") { renderOpClientes(); opSetStep("cliente", true); }
+  else if (step === "confirmar") { opSetStep("materiales", true); }
+  else if (step === "exito") { opState.clienteId = null; opState.items = []; renderOpClientes(); opSetStep("cliente", true); }
+  // en el primer paso ("operador") se deja avanzar la navegación real (salir/atrás del navegador).
+});
+
+// ---- Paso 0: elegir operador ----
+function renderOpOperadores() {
+  const grid = document.getElementById("op-operadores-grid");
+  const operadores = [...CACHE.operadores].filter(o => o.activo).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  if (operadores.length === 0) {
+    grid.innerHTML = `<div class="empty-state">No hay operadores registrados todavía. Pide a un administrador que registre uno en "Operadores".</div>`;
+    return;
+  }
+  grid.innerHTML = operadores.map(o => `
+    <button type="button" class="op-picker-card" onclick="opSeleccionarOperador(${o.id})">
+      <div class="op-picker-avatar op-picker-avatar--operador">${(o.nombre || "?").charAt(0).toUpperCase()}</div>
+      <div class="op-picker-nombre">${o.nombre}</div>
+    </button>
+  `).join("");
+}
+
+function opSeleccionarOperador(id) {
+  const o = CACHE.operadores.find(x => x.id === id);
+  if (!o) return;
+  opState.operadorId = id;
+  opState.operadorNombre = o.nombre;
+  opUpdateOperadorChip();
+  renderOpClientes();
+  opSetStep("cliente", true);
+}
+document.getElementById("op-operador-chip").addEventListener("click", () => {
+  renderOpOperadores();
+  opSetStep("operador", true);
+});
+document.getElementById("btn-op-volver-operador").addEventListener("click", () => {
+  renderOpOperadores();
+  opSetStep("operador", true);
+});
 
 // ---- Paso 1: elegir cliente ----
 function renderOpClientes() {
@@ -885,11 +1027,11 @@ function renderOpClientes() {
     return;
   }
   grid.innerHTML = generadores.map(g => `
-    <button type="button" class="op-cliente-card" onclick="opSeleccionarCliente(${g.id})">
-      <div class="op-cliente-avatar">${(g.nombre || "?").charAt(0).toUpperCase()}</div>
+    <button type="button" class="op-picker-card" onclick="opSeleccionarCliente(${g.id})">
+      <div class="op-picker-avatar">${(g.nombre || "?").charAt(0).toUpperCase()}</div>
       <div>
-        <div class="op-cliente-nombre">${g.nombre}</div>
-        <div class="op-cliente-sub">${[g.sucursal, g.ciudad].filter(Boolean).join(" · ") || "&nbsp;"}</div>
+        <div class="op-picker-nombre">${g.nombre}</div>
+        <div class="op-picker-sub">${[g.sucursal, g.ciudad].filter(Boolean).join(" · ") || "&nbsp;"}</div>
       </div>
     </button>
   `).join("");
@@ -903,7 +1045,7 @@ function opSeleccionarCliente(id) {
   document.getElementById("op-materiales-cliente-nombre").textContent = g ? g.nombre : "¿Qué recogiste?";
   renderOpCategorias();
   renderOpTicket();
-  opSetStep("materiales");
+  opSetStep("materiales", true);
 }
 document.getElementById("btn-op-volver-cliente").addEventListener("click", () => opSetStep("cliente"));
 
@@ -970,6 +1112,7 @@ function opAbrirCantidad(productoId) {
   opModalProductoId = productoId;
   document.getElementById("op-modal-producto").innerHTML = `<span class="icon">${p.icono || "📦"}</span> ${p.nombre}`;
   document.getElementById("op-modal-unidad").textContent = `Unidad: ${p.unidad}`;
+  document.getElementById("op-modal-quick").style.display = (p.unidad === "kg" || p.unidad === "lb") ? "flex" : "none";
   const actual = opCantidadEnTicket(productoId);
   document.getElementById("op-cantidad-input").value = actual > 0 ? actual : 1;
   document.getElementById("op-modal-cantidad").classList.add("open");
@@ -989,6 +1132,16 @@ document.getElementById("btn-op-mas").addEventListener("click", () => {
   const input = document.getElementById("op-cantidad-input");
   input.value = (parseFloat(input.value) || 0) + 1;
 });
+document.querySelectorAll(".op-quick-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const input = document.getElementById("op-cantidad-input");
+    input.value = (parseFloat(input.value) || 0) + parseFloat(btn.dataset.add);
+  });
+});
+
+function opVibrar() {
+  if (navigator.vibrate) navigator.vibrate(25);
+}
 
 document.getElementById("btn-op-agregar-cantidad").addEventListener("click", () => {
   const cantidad = parseFloat(document.getElementById("op-cantidad-input").value) || 0;
@@ -1002,6 +1155,7 @@ document.getElementById("btn-op-agregar-cantidad").addEventListener("click", () 
   } else {
     opState.items.push({ producto_id: p.id, nombre: p.nombre, icono: p.icono, unidad: p.unidad, valor_unitario: p.valor_unitario, cantidad });
   }
+  opVibrar();
   opCerrarModalCantidad();
   renderOpProductos();
   renderOpTicket();
@@ -1050,7 +1204,7 @@ document.getElementById("btn-op-continuar").addEventListener("click", () => {
   if (opState.items.length === 0) return;
   closeTicketPanel();
   renderOpConfirmar();
-  opSetStep("confirmar");
+  opSetStep("confirmar", true);
 });
 document.getElementById("btn-op-volver-materiales").addEventListener("click", () => opSetStep("materiales"));
 
@@ -1069,14 +1223,57 @@ function renderOpConfirmar() {
   `;
   document.getElementById("op-placa").value = "";
   document.getElementById("op-observaciones").value = "";
+  opFirmaClear();
+}
+
+// ---- Firma táctil de quien recibe ----
+const opFirmaCanvas = document.getElementById("op-firma-canvas");
+const opFirmaCtx = opFirmaCanvas.getContext("2d");
+opFirmaCtx.lineWidth = 3;
+opFirmaCtx.lineCap = "round";
+opFirmaCtx.lineJoin = "round";
+opFirmaCtx.strokeStyle = "#1a211c";
+let opFirmaDrawing = false;
+let opFirmaHasContent = false;
+
+function opFirmaPos(evt) {
+  const rect = opFirmaCanvas.getBoundingClientRect();
+  return {
+    x: (evt.clientX - rect.left) * (opFirmaCanvas.width / rect.width),
+    y: (evt.clientY - rect.top) * (opFirmaCanvas.height / rect.height),
+  };
+}
+opFirmaCanvas.addEventListener("pointerdown", (e) => {
+  opFirmaDrawing = true;
+  const p = opFirmaPos(e);
+  opFirmaCtx.beginPath();
+  opFirmaCtx.moveTo(p.x, p.y);
+  e.preventDefault();
+});
+opFirmaCanvas.addEventListener("pointermove", (e) => {
+  if (!opFirmaDrawing) return;
+  const p = opFirmaPos(e);
+  opFirmaCtx.lineTo(p.x, p.y);
+  opFirmaCtx.stroke();
+  opFirmaHasContent = true;
+  e.preventDefault();
+});
+window.addEventListener("pointerup", () => { opFirmaDrawing = false; });
+document.getElementById("btn-op-firma-limpiar").addEventListener("click", opFirmaClear);
+
+function opFirmaClear() {
+  opFirmaCtx.clearRect(0, 0, opFirmaCanvas.width, opFirmaCanvas.height);
+  opFirmaHasContent = false;
 }
 
 document.getElementById("btn-op-guardar").addEventListener("click", async () => {
   const payload = {
     fecha: new Date().toISOString().slice(0, 10),
     generador_id: opState.clienteId,
+    responsable: opState.operadorNombre,
     placa: document.getElementById("op-placa").value.trim(),
     observaciones: document.getElementById("op-observaciones").value.trim(),
+    firma_cliente: opFirmaHasContent ? opFirmaCanvas.toDataURL("image/png") : "",
     materiales: opState.items.map(i => ({
       nombre: i.nombre,
       estado: "Sólido",
@@ -1092,7 +1289,7 @@ document.getElementById("btn-op-guardar").addEventListener("click", async () => 
     const remision = await apiPost("/remisiones/", payload);
     await refreshRemisiones();
     renderOpExito(remision, false);
-    opSetStep("exito");
+    opSetStep("exito", true);
   } catch (err) {
     if (err instanceof NetworkError) {
       const item = { local_id: newLocalId(), payload, created_at: new Date().toISOString() };
@@ -1100,7 +1297,7 @@ document.getElementById("btn-op-guardar").addEventListener("click", async () => 
       await refreshPending();
       updateSyncStatus();
       renderOpExito(pendingAsRemision(item), true);
-      opSetStep("exito");
+      opSetStep("exito", true);
     } else {
       showError(err);
     }
@@ -1125,7 +1322,7 @@ document.getElementById("btn-op-nueva").addEventListener("click", () => {
   opState.clienteId = null;
   opState.items = [];
   renderOpClientes();
-  opSetStep("cliente");
+  opSetStep("cliente", true);
 });
 
 // ---------- Init ----------

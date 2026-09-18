@@ -34,6 +34,7 @@
       <button class="nav-item" data-view="remisiones">Remisiones</button>
       <button class="nav-item" data-view="generadores">Generadores</button>
       <button class="nav-item" data-view="productos">Productos</button>
+      <button class="nav-item" data-view="operadores">Operadores</button>
       <button class="nav-item" data-view="certificados">Certificados</button>
       <button class="nav-item" data-view="empresa">Mi empresa</button>
     </nav>
@@ -296,6 +297,28 @@
       <div class="panel" id="productos-panel"></div>
     </section>
 
+    <!-- OPERADORES -->
+    <section id="view-operadores" class="view">
+      <header class="view-header">
+        <h1>Operadores</h1>
+        <p>Personas que recolectan en sitio y usan "Modo operador". Aparecen como opción al abrir ese modo.</p>
+      </header>
+      <div class="panel">
+        <form id="form-operador" class="form-grid">
+          <input type="hidden" id="oper-id" value="">
+          <div class="field">
+            <label>Nombre completo</label>
+            <input type="text" id="oper-nombre" placeholder="Ej: Juan Pérez" required>
+          </div>
+          <div class="field form-actions">
+            <button type="button" class="btn btn-ghost" id="btn-oper-cancelar" style="display:none;">Cancelar edición</button>
+            <button type="submit" class="btn btn-primary" id="btn-oper-guardar">+ Agregar operador</button>
+          </div>
+        </form>
+      </div>
+      <div class="panel" id="operadores-panel"></div>
+    </section>
+
     <!-- CERTIFICADOS -->
     <section id="view-certificados" class="view">
       <header class="view-header">
@@ -374,15 +397,27 @@
   <header class="op-header">
     <div class="op-brand">
       <div class="op-brand-mark" id="op-brand-mark">R</div>
-      <div class="op-brand-title" id="op-brand-title">Remisiones</div>
+      <div>
+        <div class="op-brand-title" id="op-brand-title">Remisiones</div>
+        <button class="op-operador-chip" id="op-operador-chip" style="display:none;">👤 —</button>
+      </div>
     </div>
     <button class="op-admin-link" id="btn-modo-admin">⚙ Modo administrador</button>
   </header>
 
+  <!-- Paso 0: quién recolecta -->
+  <section class="op-step active" id="op-step-operador">
+    <h1 class="op-step-title">¿Quién sos?</h1>
+    <div class="op-picker-grid" id="op-operadores-grid"></div>
+  </section>
+
   <!-- Paso 1: cliente -->
-  <section class="op-step active" id="op-step-cliente">
-    <h1 class="op-step-title">¿Para quién es la recolección?</h1>
-    <div class="op-clientes-grid" id="op-clientes-grid"></div>
+  <section class="op-step" id="op-step-cliente">
+    <div class="op-step-head">
+      <button class="op-back" id="btn-op-volver-operador">‹ Volver</button>
+      <h1 class="op-step-title">¿Para quién es la recolección?</h1>
+    </div>
+    <div class="op-picker-grid" id="op-clientes-grid"></div>
   </section>
 
   <!-- Paso 2: materiales -->
@@ -410,6 +445,11 @@
       <div class="field">
         <label>Notas <span class="hint">(opcional)</span></label>
         <textarea id="op-observaciones" rows="2"></textarea>
+      </div>
+      <div class="field">
+        <label>Firma de quien recibe <span class="hint">(opcional, con el dedo)</span></label>
+        <canvas id="op-firma-canvas" class="op-firma-canvas" width="600" height="220"></canvas>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-op-firma-limpiar">Borrar firma</button>
       </div>
     </div>
     <button class="btn-op-primary btn-op-full" id="btn-op-guardar">✅ Guardar recolección</button>
@@ -454,6 +494,11 @@
         <button class="op-stepper-btn" id="btn-op-menos" type="button">−</button>
         <input type="number" id="op-cantidad-input" inputmode="decimal" min="0" step="0.5" value="1">
         <button class="op-stepper-btn" id="btn-op-mas" type="button">+</button>
+      </div>
+      <div class="op-modal-quick" id="op-modal-quick">
+        <button type="button" class="op-quick-btn" data-add="10">+10</button>
+        <button type="button" class="op-quick-btn" data-add="50">+50</button>
+        <button type="button" class="op-quick-btn" data-add="100">+100</button>
       </div>
       <div class="op-modal-unidad" id="op-modal-unidad"></div>
       <div class="op-modal-actions">

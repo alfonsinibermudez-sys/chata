@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from config import APP_ENV
 from database import init_db, close_db, health_check
 from logger_setup import setup_logging
-from routes import empresa, generadores, remisiones, certificados, productos
+from routes import empresa, generadores, remisiones, certificados, productos, operadores
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -39,6 +39,7 @@ app.include_router(generadores.router, prefix="/api/generadores", tags=["generad
 app.include_router(remisiones.router, prefix="/api/remisiones", tags=["remisiones"])
 app.include_router(certificados.router, prefix="/api/certificados", tags=["certificados"])
 app.include_router(productos.router, prefix="/api/productos", tags=["productos"])
+app.include_router(operadores.router, prefix="/api/operadores", tags=["operadores"])
 
 
 @app.get("/health")

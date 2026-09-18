@@ -1,7 +1,7 @@
 // Service worker: caches the app shell so the app opens instantly and works
 // offline. API calls (/api/*) are never intercepted here — offline writes for
 // those are handled by the app itself via IndexedDB (see js/idb.js).
-const CACHE_VERSION = "shell-v2";
+const CACHE_VERSION = "shell-v3";
 
 const SHELL_FILES = [
   "/",
