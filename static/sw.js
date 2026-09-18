@@ -1,7 +1,7 @@
 // Service worker: caches the app shell so the app opens instantly and works
 // offline. API calls (/api/*) are never intercepted here — offline writes for
 // those are handled by the app itself via IndexedDB (see js/idb.js).
-const CACHE_VERSION = "shell-v4";
+const CACHE_VERSION = "shell-v5";
 
 const SHELL_FILES = [
   "/",
@@ -38,18 +38,18 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
   if (event.request.method !== "GET") return;
 
-  // Stale-while-revalidate for the app shell: instant load from cache,
-  // silently refreshed in the background when online.
+  // Network-first for the app shell: online users always get what was just
+  // deployed (no "reload twice after a deploy" staleness); offline users
+  // fall back to the last cached copy so the app still opens.
   event.respondWith(
     caches.open(CACHE_VERSION).then(async (cache) => {
-      const cached = await cache.match(event.request);
-      const network = fetch(event.request)
-        .then((res) => {
-          if (res && res.ok) cache.put(event.request, res.clone());
-          return res;
-        })
-        .catch(() => null);
-      return cached || (await network) || caches.match("/index.html");
+      try {
+        const res = await fetch(event.request);
+        if (res && res.ok) cache.put(event.request, res.clone());
+        return res;
+      } catch (e) {
+        return (await cache.match(event.request)) || caches.match("/index.html");
+      }
     })
   );
 });
